@@ -961,42 +961,46 @@ video.nft-media {
 }
 
 .profile-screen {
-  gap: 8px;
+  gap: 10px;
   overflow: auto;
   padding-right: 2px;
+  padding-top: 2px;
 }
 
 .profile-top {
-  border: 1px solid var(--stroke);
-  border-radius: 16px;
-  background:
-    radial-gradient(180px 96px at 90% -22%, rgba(255, 255, 255, 0.1), transparent 72%),
-    linear-gradient(180deg, rgba(23, 23, 23, 0.92), rgba(12, 12, 12, 0.92));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    var(--shadow-soft);
-  padding: 9px 10px;
+  padding: 2px 2px 12px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
+  position: relative;
+}
+
+.profile-top::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
 }
 
 .profile-avatar,
 .nav-avatar {
-  width: 46px;
-  height: 46px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
-  border: 1px solid var(--stroke-strong);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   overflow: hidden;
   display: grid;
   place-items: center;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 800;
   color: var(--text-1);
   background:
-    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.14), transparent 54%),
-    linear-gradient(180deg, #262626 0%, #171717 100%);
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.16), transparent 56%),
+    linear-gradient(180deg, #2a2a2a 0%, #181818 100%);
 }
 
 .nav-avatar {
@@ -1015,12 +1019,13 @@ video.nft-media {
 .profile-meta {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 
 .profile-meta h2 {
-  font-size: clamp(18px, 5.8vw, 23px);
+  font-size: clamp(20px, 6.4vw, 30px);
   line-height: 1;
+  letter-spacing: -0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1029,14 +1034,14 @@ video.nft-media {
 .profile-subline {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
   min-width: 0;
 }
 
 .profile-meta p {
-  color: var(--text-2);
-  font-size: 12px;
+  color: #b8c1cf;
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -1046,99 +1051,104 @@ video.nft-media {
 .profile-id {
   display: inline-flex;
   align-items: center;
-  width: fit-content;
-  height: 18px;
-  padding: 0 7px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.26);
-  color: var(--text-3);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  color: #7f8a9a;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .profile-rank {
-  min-width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: rgba(9, 9, 9, 0.84);
+  min-width: 54px;
   display: grid;
-  place-items: center;
-  text-align: center;
-  padding: 4px;
+  justify-items: end;
+  align-content: center;
+  text-align: right;
+  gap: 1px;
+  padding-right: 2px;
+}
+
+.profile-rank::before {
+  content: "";
+  width: 42px;
+  height: 1px;
+  margin-bottom: 2px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.34));
 }
 
 .profile-rank span {
   display: block;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 800;
-  color: var(--text-3);
-  letter-spacing: 0.05em;
+  color: #8a95a6;
+  letter-spacing: 0.08em;
 }
 
 .profile-rank strong {
   display: block;
-  margin-top: 2px;
-  font-size: 11px;
+  margin-top: 1px;
+  font-size: 18px;
   line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 .stat-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 0;
+  padding: 4px 0 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .stat-row div {
-  border: 1px solid var(--stroke);
-  border-radius: 12px;
-  padding: 8px;
-  background:
-    linear-gradient(180deg, rgba(18, 18, 18, 0.9), rgba(10, 10, 10, 0.9));
+  padding: 6px 8px 4px;
+  text-align: center;
+}
+
+.stat-row div + div {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .stat-row span {
   display: block;
-  color: var(--text-3);
-  font-size: 9px;
+  color: #8a94a3;
+  font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .stat-row strong {
   display: block;
-  margin-top: 3px;
-  font-size: 16px;
+  margin-top: 4px;
+  font-size: 20px;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
 }
 
 .wallet-btn {
   width: 100%;
-  height: 42px;
-  border: 1px solid var(--stroke);
-  border-radius: 15px;
+  height: 44px;
+  border: 1px solid rgba(113, 184, 255, 0.56);
+  border-radius: 14px;
   background:
-    radial-gradient(220px 120px at 10% -90%, rgba(255, 255, 255, 0.09), transparent 72%),
-    radial-gradient(220px 120px at 110% -90%, rgba(255, 255, 255, 0.12), transparent 72%),
-    linear-gradient(180deg, rgba(22, 22, 22, 0.94), rgba(12, 12, 12, 0.94));
+    radial-gradient(220px 100px at 0% -120%, rgba(84, 173, 255, 0.3), transparent 72%),
+    radial-gradient(220px 120px at 100% -120%, rgba(89, 244, 226, 0.24), transparent 72%),
+    linear-gradient(180deg, rgba(20, 30, 46, 0.86), rgba(14, 19, 30, 0.86));
   color: var(--text-1);
   font-family: inherit;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 800;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease, filter 0.25s ease;
 }
 
 .wallet-btn:hover {
-  border-color: var(--stroke-strong);
+  border-color: rgba(128, 201, 255, 0.84);
   box-shadow:
-    0 12px 26px rgba(0, 0, 0, 0.4),
-    0 0 20px rgba(255, 255, 255, 0.1);
+    0 12px 22px rgba(0, 0, 0, 0.32),
+    0 0 26px rgba(56, 173, 255, 0.2);
+  filter: brightness(1.05);
 }
 
 .wallet-btn:active {
@@ -1172,48 +1182,59 @@ video.nft-media {
 }
 
 .wallet-short {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  color: var(--text-3);
-  text-align: center;
+  color: #8a95a6;
+  text-align: left;
+  padding-left: 2px;
 }
 
 .profile-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5px;
-  padding: 4px;
-  border-radius: 13px;
-  border: 1px solid var(--stroke);
-  background:
-    linear-gradient(180deg, rgba(17, 17, 17, 0.92), rgba(9, 9, 9, 0.92));
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 2px;
 }
 
 .profile-tab-btn {
-  height: 32px;
+  position: relative;
+  height: 30px;
+  padding: 0;
   border: 0;
-  border-radius: 11px;
   background: transparent;
-  color: var(--text-3);
+  color: #7d8798;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
+  letter-spacing: -0.01em;
   cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  transition: color 0.2s ease;
+}
+
+.profile-tab-btn::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -5px;
+  height: 2px;
+  border-radius: 999px;
+  background: transparent;
 }
 
 .profile-tab-btn.is-active {
   color: var(--text-1);
-  border: 1px solid var(--stroke-strong);
-  background:
-    linear-gradient(180deg, rgba(34, 34, 34, 0.92), rgba(21, 21, 21, 0.92));
+}
+
+.profile-tab-btn.is-active::after {
+  background: linear-gradient(90deg, #3ec7ff, #8ae8ff);
 }
 
 .profile-nft-grid {
   display: none;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  max-height: 212px;
+  gap: 10px;
+  max-height: clamp(220px, 40vh, 320px);
   overflow: auto;
   padding-right: 4px;
 }
@@ -1349,18 +1370,24 @@ video.nft-media {
   }
 
   .profile-avatar {
-    width: 42px;
-    height: 42px;
+    width: 46px;
+    height: 46px;
   }
 
   .profile-rank {
-    width: 48px;
-    height: 48px;
-    min-width: 48px;
+    min-width: 46px;
+  }
+
+  .profile-rank strong {
+    font-size: 16px;
+  }
+
+  .profile-meta h2 {
+    font-size: clamp(18px, 7vw, 26px);
   }
 
   .stat-row strong {
-    font-size: 15px;
+    font-size: 17px;
   }
 }
 
