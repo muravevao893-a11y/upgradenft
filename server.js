@@ -13,10 +13,15 @@ const COOLDOWN_MS = clamp(toInt(process.env.COOLDOWN_MS, 4500), 0, 120000);
 const QUEUE_RETRY_MS = clamp(toInt(process.env.QUEUE_RETRY_MS, 1200), 400, 15000);
 const STAKE_AMOUNT_NANO = String(process.env.STAKE_AMOUNT_NANO || "1").trim();
 const REWARD_MODE = String(process.env.REWARD_MODE || "nft").trim().toLowerCase();
+const TONAPI_BASE = String(process.env.TONAPI_BASE || "https://tonapi.io/v2").replace(/\/$/, "");
+const TONAPI_TIMEOUT_MS = clamp(toInt(process.env.TONAPI_TIMEOUT_MS, 12000), 3000, 30000);
+const TELEGRAM_GIFTS_PROVIDER_URL = String(process.env.TELEGRAM_GIFTS_PROVIDER_URL || "").trim();
+const TELEGRAM_GIFTS_PROVIDER_TOKEN = String(process.env.TELEGRAM_GIFTS_PROVIDER_TOKEN || "").trim();
 
 const sessions = new Map();
 const requestIndex = new Map();
 const walletState = new Map();
+const profileGiftStore = new Map();
 
 const injectedGifts = safeParseJson(process.env.TELEGRAM_GIFTS_JSON, []);
 
@@ -52,6 +57,241 @@ function safeParseJson(raw, fallback) {
   } catch {
     return fallback;
   }
+}
+
+async function fetchJson(url, timeoutMs = 12000, headers = null) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+      headers: headers && typeof headers === "object" ? headers : undefined,
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function firstNonEmptyString(...values) {
+  for (const value of values) {
+    const text = String(value ?? "").trim();
+    if (text) return text;
+  }
+  return "";
+}
+
+function firstFiniteNumber(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
+  }
+  return NaN;
+}
+
+function parseTokenAmount(rawValue, decimals = 9) {
+  try {
+    const value = BigInt(String(rawValue));
+    const negative = value < 0n;
+    const abs = negative ? -value : value;
+    const safeDecimals = Math.max(0, Math.min(18, Number(decimals) || 9));
+    const divisor = 10n ** BigInt(safeDecimals);
+    const whole = abs / divisor;
+    const fraction = abs % divisor;
+    const fractionText = safeDecimals ? fraction.toString().padStart(safeDecimals, "0").slice(0, 6) : "";
+    const combined = fractionText ? `${whole}.${fractionText}`.replace(/\.?0+$/, "") : whole.toString();
+    const asNumber = Number(combined);
+    if (!Number.isFinite(asNumber)) return NaN;
+    return negative ? -asNumber : asNumber;
+  } catch {
+    return NaN;
+  }
+}
+
+function parseTonPriceNode(node) {
+  if (!node || typeof node !== "object") return NaN;
+  const currencyType = String(node.currency_type || "").toLowerCase();
+  const tokenName = String(node.token_name || "").toUpperCase();
+  if (currencyType !== "ton" && tokenName !== "TON") return NaN;
+  return parseTokenAmount(node.value, Number(node.decimals) || 9);
+}
+
+function extractGiftItems(payload) {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  const candidates = [
+    payload.gifts,
+    payload.items,
+    payload.result,
+    payload.data?.gifts,
+    payload.data?.items,
+    payload.data?.result,
+  ];
+  for (const entry of candidates) {
+    if (Array.isArray(entry)) return entry;
+  }
+  return [];
+}
+
+function dedupeGifts(list) {
+  const map = new Map();
+  safeArray(list).forEach((item, index) => {
+    if (!item || typeof item !== "object") return;
+    const key = firstNonEmptyString(
+      item.id,
+      item.gift_id,
+      item.nft_address,
+      item.nftAddress,
+      item.token_id,
+      item.tokenId,
+      item.address,
+      item.name ? `${item.name}-${index}` : "",
+    );
+    if (!key) return;
+    if (!map.has(key)) {
+      map.set(key, item);
+      return;
+    }
+    const prev = map.get(key);
+    map.set(key, { ...prev, ...item });
+  });
+  return Array.from(map.values());
+}
+
+function getProfileStoredGifts(userId) {
+  const key = String(userId || "").trim();
+  if (!key) return [];
+  return dedupeGifts(profileGiftStore.get(key) || []);
+}
+
+function mapTonapiNftToGift(item, index) {
+  const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
+  const previews = safeArray(item?.previews);
+  const imagePreview = previews.find((entry) => String(entry?.mime_type || "").toLowerCase().includes("image"))
+    || previews.find((entry) => String(entry?.url || "").trim())
+    || null;
+  const videoPreview = previews.find((entry) => String(entry?.mime_type || "").toLowerCase().includes("video"))
+    || null;
+
+  const id = firstNonEmptyString(item?.address, item?.index, `tonapi-${index + 1}`);
+  const name = firstNonEmptyString(
+    metadata?.name,
+    item?.metadata?.name,
+    item?.collection?.name ? `${item.collection.name} #${item?.index ?? ""}` : "",
+    "Telegram Gift",
+  );
+  const animationUrl = firstNonEmptyString(
+    metadata?.animation_url,
+    metadata?.animationUrl,
+    metadata?.video_url,
+    metadata?.videoUrl,
+    metadata?.gif_url,
+    metadata?.gifUrl,
+    videoPreview?.url,
+  );
+  const imageUrl = firstNonEmptyString(
+    metadata?.image,
+    metadata?.image_url,
+    metadata?.imageUrl,
+    metadata?.thumbnail,
+    metadata?.poster,
+    imagePreview?.url,
+  );
+  const priceTon = firstFiniteNumber(
+    parseTonPriceNode(item?.sale?.price),
+    parseTonPriceNode(item?.auction?.price),
+  );
+
+  return {
+    id,
+    nft_address: String(item?.address || "").trim(),
+    token_id: String(item?.index ?? "").trim(),
+    name,
+    image_url: imageUrl,
+    animation_url: animationUrl,
+    price_ton: Number.isFinite(priceTon) && priceTon > 0 ? priceTon : undefined,
+    tier: String(item?.trust || "Rare"),
+    is_upgraded: true,
+    source: "wallet",
+  };
+}
+
+async function fetchTonapiWalletGifts(wallet) {
+  const normalizedWallet = String(wallet || "").trim();
+  if (!normalizedWallet || !TONAPI_BASE) return [];
+
+  const encoded = encodeURIComponent(normalizedWallet);
+  const gifts = [];
+  let offset = 0;
+  const limit = 100;
+
+  for (let page = 0; page < 3; page += 1) {
+    const url = `${TONAPI_BASE}/accounts/${encoded}/nfts?limit=${limit}&offset=${offset}&indirect_ownership=true`;
+    const payload = await fetchJson(url, TONAPI_TIMEOUT_MS);
+    if (!payload) break;
+    const items = safeArray(payload?.nft_items);
+    if (!items.length) break;
+
+    items.forEach((item, index) => {
+      const mapped = mapTonapiNftToGift(item, offset + index);
+      if (mapped) gifts.push(mapped);
+    });
+
+    if (items.length < limit) break;
+    offset += limit;
+  }
+
+  return dedupeGifts(gifts);
+}
+
+async function fetchProviderGifts(reqUrl) {
+  if (!TELEGRAM_GIFTS_PROVIDER_URL) return [];
+
+  let providerUrl;
+  try {
+    providerUrl = new URL(TELEGRAM_GIFTS_PROVIDER_URL);
+  } catch {
+    return [];
+  }
+
+  const passKeys = [
+    "user_id",
+    "username",
+    "wallet",
+    "wallet_address",
+    "wallet_raw",
+    "connected_wallet",
+    "source",
+    "scope",
+    "upgraded_only",
+    "include_upgraded",
+    "include_wallet",
+    "include_profile",
+  ];
+  passKeys.forEach((key) => {
+    const value = reqUrl.searchParams.get(key);
+    if (value !== null && value !== "") {
+      providerUrl.searchParams.set(key, value);
+    }
+  });
+
+  const headers = {};
+  if (TELEGRAM_GIFTS_PROVIDER_TOKEN) {
+    headers.Authorization = `Bearer ${TELEGRAM_GIFTS_PROVIDER_TOKEN}`;
+  }
+
+  const payload = await fetchJson(providerUrl.toString(), TONAPI_TIMEOUT_MS, headers);
+  const items = extractGiftItems(payload);
+  return dedupeGifts(items);
 }
 
 function readJsonBody(req) {
@@ -384,14 +624,61 @@ async function handleAbort(req, res) {
   sendJson(res, 200, { ok: true });
 }
 
-function handleGifts(reqUrl, res) {
+async function handleSetGifts(req, res) {
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch (error) {
+    sendJson(res, 400, { ok: false, error_code: "bad_json", error: String(error.message || error) });
+    return;
+  }
+
+  const userId = String(body?.user_id ?? "").trim();
+  const gifts = dedupeGifts(safeArray(body?.gifts));
+  if (!userId) {
+    sendJson(res, 400, { ok: false, error_code: "bad_request", error: "Missing user_id" });
+    return;
+  }
+
+  profileGiftStore.set(userId, gifts);
+  sendJson(res, 200, { ok: true, user_id: userId, count: gifts.length });
+}
+
+async function handleGifts(reqUrl, res) {
   const userId = String(reqUrl.searchParams.get("user_id") || "").trim();
-  const wallet = String(reqUrl.searchParams.get("wallet") || "").trim();
+  const wallet = firstNonEmptyString(
+    reqUrl.searchParams.get("wallet"),
+    reqUrl.searchParams.get("wallet_address"),
+    reqUrl.searchParams.get("connected_wallet"),
+  );
+
+  const sourceParam = String(reqUrl.searchParams.get("source") || "all").trim().toLowerCase();
+  const includeWallet = sourceParam !== "telegram";
+  const includeProfile = sourceParam !== "wallet";
+
+  const merged = [];
+  if (includeProfile) {
+    merged.push(...safeArray(injectedGifts));
+    merged.push(...getProfileStoredGifts(userId));
+    const providerItems = await fetchProviderGifts(reqUrl);
+    if (providerItems.length > 0) {
+      merged.push(...providerItems);
+    }
+  }
+  if (includeWallet && wallet) {
+    const walletItems = await fetchTonapiWalletGifts(wallet);
+    if (walletItems.length > 0) {
+      merged.push(...walletItems);
+    }
+  }
+
+  const gifts = dedupeGifts(merged);
   sendJson(res, 200, {
     ok: true,
     user_id: userId || null,
     wallet: wallet || null,
-    gifts: Array.isArray(injectedGifts) ? injectedGifts : [],
+    source: sourceParam || "all",
+    gifts,
   });
 }
 
@@ -413,7 +700,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (method === "GET" && (path === "/telegram/gifts" || path === "/telegram-gifts" || path === "/gifts")) {
-    handleGifts(reqUrl, res);
+    await handleGifts(reqUrl, res);
+    return;
+  }
+
+  if (method === "POST" && (path === "/telegram/gifts/set" || path === "/telegram-gifts/set")) {
+    await handleSetGifts(req, res);
     return;
   }
 
@@ -441,4 +733,3 @@ server.listen(PORT, HOST, () => {
   // eslint-disable-next-line no-console
   console.log(`[upnft-backend] listening on http://${HOST}:${PORT}`);
 });
-
