@@ -67,6 +67,8 @@ const state = {
   spinRafId: null,
 };
 
+const APP_VERSION = "2026-02-22-3";
+
 const fallbackUser = {
   id: null,
   first_name: "Гость",
@@ -459,7 +461,7 @@ function setupTonConnect() {
     return;
   }
 
-  const manifestUrl = new URL("./tonconnect-manifest.json", window.location.href).toString();
+  const manifestUrl = new URL(`./tonconnect-manifest.json?v=${APP_VERSION}`, window.location.href).toString();
 
   try {
     state.tonConnectUI = new window.TON_CONNECT_UI.TonConnectUI({
