@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-65";
+const APP_VERSION = "2026-02-22-71";
 
 const tabMeta = {
   tasks: {
@@ -101,6 +101,18 @@ const UPGRADE_MAX_TARGET_OFFSET = clamp(
   0,
   1000000,
 );
+const MAX_UPGRADE_SOURCE_NFTS = clamp(
+  Math.floor(toNumber(window.__UPNFT_MAX_SOURCE_NFTS__, 5)),
+  1,
+  5,
+);
+const UPGRADE_STEP_SOURCE = "source";
+const UPGRADE_STEP_TARGET = "target";
+const BOOT_SPLASH_MIN_MS = clamp(
+  Math.floor(toNumber(window.__UPNFT_BOOT_SPLASH_MIN_MS__, 800)),
+  250,
+  5000,
+);
 const TON_CHAIN_MAINNET = "-239";
 const TON_CHAIN_TESTNET = "-3";
 
@@ -188,6 +200,11 @@ const TRANSLATIONS = {
     note_upgrade_penalty: "Offer lock: {seconds}s",
     button_upgrade_start: "Запустить апгрейд",
     button_upgrade_spin: "Крутим...",
+    button_continue: "Продолжить",
+    button_back: "Назад",
+    title_pick_target: "Выбор NFT",
+    note_pick_target: "Выбери цель апгрейда",
+    note_pick_source: "Выбери до {count} NFT",
 
     button_upgrade_queue: "Queue...",
     button_upgrade_cooldown: "Cooldown {seconds}s",
@@ -214,6 +231,9 @@ const TRANSLATIONS = {
     own_empty_no_price: "Нет NFT с рыночной TON-ценой.",
     own_empty_filter: "Нет результатов по фильтру.",
     own_empty_not_loaded: "NFT не загружены.",
+    nft_card_auction_soon: "Аукцион скоро завершится",
+    nft_card_owned: "В инвентаре",
+    nft_status_for_sale: "For sale",
     nft_status_market: "Маркет",
     nft_status_wallet: "Кошелек",
     nft_status_telegram: "Telegram",
@@ -319,6 +339,11 @@ const TRANSLATIONS = {
     note_upgrade_penalty: "Offer lock: {seconds}s",
     button_upgrade_start: "Start upgrade",
     button_upgrade_spin: "Spinning...",
+    button_continue: "Continue",
+    button_back: "Back",
+    title_pick_target: "Pick target",
+    note_pick_target: "Pick upgrade target",
+    note_pick_source: "Choose up to {count} NFT",
 
     button_upgrade_queue: "Queue...",
     button_upgrade_cooldown: "Cooldown {seconds}s",
@@ -345,6 +370,9 @@ const TRANSLATIONS = {
     own_empty_no_price: "No NFT with TON market price.",
     own_empty_filter: "No results for current filter.",
     own_empty_not_loaded: "NFT not loaded.",
+    nft_card_auction_soon: "Auction will close soon",
+    nft_card_owned: "In inventory",
+    nft_status_for_sale: "For sale",
     nft_status_market: "Market",
     nft_status_wallet: "Wallet",
     nft_status_telegram: "Telegram",
@@ -450,6 +478,11 @@ const TRANSLATIONS = {
     note_upgrade_penalty: "Offer lock: {seconds}s",
     button_upgrade_start: "Запустити апгрейд",
     button_upgrade_spin: "Крутимо...",
+    button_continue: "Продовжити",
+    button_back: "Назад",
+    title_pick_target: "Вибір NFT",
+    note_pick_target: "Обери ціль апгрейду",
+    note_pick_source: "Обери до {count} NFT",
 
     button_upgrade_queue: "Queue...",
     button_upgrade_cooldown: "Cooldown {seconds}s",
@@ -476,6 +509,9 @@ const TRANSLATIONS = {
     own_empty_no_price: "Немає NFT з ринковою TON-ціною.",
     own_empty_filter: "Немає результатів за фільтром.",
     own_empty_not_loaded: "NFT не завантажені.",
+    nft_card_auction_soon: "Аукціон скоро завершиться",
+    nft_card_owned: "В інвентарі",
+    nft_status_for_sale: "For sale",
     nft_status_market: "Маркет",
     nft_status_wallet: "Гаманець",
     nft_status_telegram: "Telegram",
@@ -568,7 +604,9 @@ const state = {
     },
   },
   selectedOwnId: null,
+  selectedOwnIds: [],
   selectedTargetId: null,
+  upgradeStep: UPGRADE_STEP_SOURCE,
   profileTab: "my",
   profileTabsBound: false,
   profileCopyBound: false,
@@ -644,6 +682,10 @@ const state = {
     ready: false,
   },
 };
+
+let bootSplashStartedAt = (typeof performance !== "undefined" && typeof performance.now === "function")
+  ? performance.now()
+  : Date.now();
 
 const CP1251_DECODER = (() => {
   try {
@@ -1049,6 +1091,51 @@ function normalizeMediaUrl(value) {
   return raw;
 }
 
+function pushUniqueMediaCandidate(target, value) {
+  const normalized = normalizeMediaUrl(String(value ?? "").trim());
+  if (!normalized) return;
+  if (!target.includes(normalized)) {
+    target.push(normalized);
+  }
+}
+
+function normalizeMediaCandidateList(...values) {
+  const normalized = [];
+  const visited = new Set();
+
+  const pushValue = (value, depth = 0) => {
+    if (depth > 3 || value === undefined || value === null) return;
+
+    if (Array.isArray(value)) {
+      value.forEach((entry) => pushValue(entry, depth + 1));
+      return;
+    }
+
+    if (typeof value === "object") {
+      if (visited.has(value)) return;
+      visited.add(value);
+      pushValue(value.url, depth + 1);
+      pushValue(value.src, depth + 1);
+      pushValue(value.image, depth + 1);
+      pushValue(value.image_url, depth + 1);
+      pushValue(value.preview_url, depth + 1);
+      pushValue(value.content_url, depth + 1);
+      pushValue(value.video, depth + 1);
+      pushValue(value.video_url, depth + 1);
+      pushValue(value.animation, depth + 1);
+      pushValue(value.animation_url, depth + 1);
+      pushValue(value.gif, depth + 1);
+      pushValue(value.gif_url, depth + 1);
+      return;
+    }
+
+    pushUniqueMediaCandidate(normalized, value);
+  };
+
+  values.forEach((entry) => pushValue(entry, 0));
+  return normalized;
+}
+
 function byId(list, id) {
   return list.find((item) => item.id === id) ?? null;
 }
@@ -1352,7 +1439,9 @@ function applyStaticLocalization() {
   setText("#copy-fair-btn", t("fair_copy"));
   setText("#chance-ring .chance-core small", t("chance_probability"));
   setText("#math-note", t("note_select_nft"));
-  setText(".upgrade-screen .block-title", t("my_nft_title"));
+  setText("#upgrade-side-title", t("my_nft_title"));
+  setText("#upgrade-continue-btn", t("button_continue"));
+  setText("#upgrade-back-btn", t("button_back"));
   setText(".history-head h3", t("history_title"));
   setText("#history-clear-btn", t("history_clear"));
   setText("#upgrade-btn", getUpgradeButtonLabel());
@@ -1470,6 +1559,33 @@ function setupLocalization() {
 
 function nowMs() {
   return Date.now();
+}
+
+function nowHiResMs() {
+  if (typeof performance !== "undefined" && typeof performance.now === "function") {
+    return performance.now();
+  }
+  return nowMs();
+}
+
+function markBootSplashStart() {
+  bootSplashStartedAt = nowHiResMs();
+}
+
+async function hideBootSplash() {
+  const loader = document.getElementById("boot-loader");
+  if (!loader || loader.classList.contains("is-hidden")) return;
+
+  const elapsed = Math.max(0, nowHiResMs() - bootSplashStartedAt);
+  const waitMs = Math.max(0, BOOT_SPLASH_MIN_MS - elapsed);
+  if (waitMs > 0) {
+    await sleepMs(waitMs);
+  }
+
+  loader.classList.add("is-hiding");
+  await sleepMs(320);
+  loader.classList.add("is-hidden");
+  loader.setAttribute("aria-hidden", "true");
 }
 
 function readLocalJson(key, fallback) {
@@ -2027,7 +2143,7 @@ function getEligibleTargetsForSource(source, list = state.data.targets) {
   return safeArray(list).filter((target) => isTargetWithinUpgradeLimit(source, target));
 }
 
-function getFilteredTargets(source = byId(state.data.inventory, state.selectedOwnId)) {
+function getFilteredTargets(source = getSelectedSourceAggregate()) {
   const eligibleTargets = getEligibleTargetsForSource(source, state.data.targets);
   const filtered = filterNfts(eligibleTargets, state.ui.targetSearch);
   return sortNfts(filtered, state.ui.targetSort);
@@ -2038,13 +2154,84 @@ function getFilteredOwnNfts() {
   return sortNfts(filtered, state.ui.ownSort);
 }
 
+function moveTargetPanelToSide() {
+  const sideCol = document.querySelector(".upgrade-side-col");
+  const targetPanel = document.getElementById("target-panel");
+  if (!sideCol || !targetPanel) return;
+
+  if (targetPanel.parentElement !== sideCol) {
+    sideCol.append(targetPanel);
+  }
+}
+
+function updateUpgradeStepLayout() {
+  moveTargetPanelToSide();
+  const sourceStep = state.upgradeStep === UPGRADE_STEP_SOURCE;
+  const selectedCount = getSelectedOwnItems().length;
+
+  const screen = document.querySelector(".upgrade-screen");
+  const sideTitle = document.getElementById("upgrade-side-title");
+  const targetPanel = document.getElementById("target-panel");
+  const ownControls = document.getElementById("own-controls");
+  const ownList = document.getElementById("own-nft-list");
+  const ownEmpty = document.getElementById("own-empty");
+  const continueBtn = document.getElementById("upgrade-continue-btn");
+  const backBtn = document.getElementById("upgrade-back-btn");
+
+  if (screen) {
+    screen.classList.toggle("is-source-step", sourceStep);
+    screen.classList.toggle("is-target-step", !sourceStep);
+  }
+  if (sideTitle) {
+    sideTitle.textContent = sourceStep ? t("my_nft_title") : t("title_pick_target");
+  }
+  if (targetPanel) targetPanel.classList.toggle("hidden", sourceStep);
+  if (ownControls) ownControls.classList.toggle("hidden", !sourceStep);
+  if (ownList) ownList.classList.toggle("hidden", !sourceStep);
+  if (ownEmpty && !sourceStep) ownEmpty.classList.add("hidden");
+
+  if (continueBtn) {
+    continueBtn.textContent = t("button_continue");
+    continueBtn.classList.toggle("hidden", !sourceStep || selectedCount === 0 || state.isSpinning);
+  }
+
+  if (backBtn) {
+    backBtn.textContent = t("button_back");
+    backBtn.classList.toggle("hidden", sourceStep || state.isSpinning);
+  }
+}
+
+function toggleSelectedSourceNft(nftId) {
+  const id = String(nftId ?? "").trim();
+  if (!id) return false;
+
+  const next = safeArray(state.selectedOwnIds)
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean);
+  const currentIndex = next.indexOf(id);
+  if (currentIndex >= 0) {
+    next.splice(currentIndex, 1);
+  } else {
+    if (next.length >= MAX_UPGRADE_SOURCE_NFTS) return false;
+    next.push(id);
+  }
+
+  state.selectedOwnIds = next;
+  state.selectedOwnId = next[0] ?? null;
+  return true;
+}
+
 function setupUpgradeUiControls() {
   if (state.upgradesUiBound) return;
+
+  moveTargetPanelToSide();
 
   const targetSearch = document.getElementById("target-search");
   const targetSort = document.getElementById("target-sort");
   const ownSearch = document.getElementById("own-search");
   const ownSort = document.getElementById("own-sort");
+  const continueBtn = document.getElementById("upgrade-continue-btn");
+  const backBtn = document.getElementById("upgrade-back-btn");
   const historyClear = document.getElementById("history-clear-btn");
   const copyFair = document.getElementById("copy-fair-btn");
   const onboardingConnect = document.getElementById("onboarding-connect");
@@ -2088,6 +2275,27 @@ function setupUpgradeUiControls() {
     });
   }
 
+  if (continueBtn) {
+    continueBtn.addEventListener("click", () => {
+      if (state.isSpinning) return;
+      ensureSelectedIds();
+      if (getSelectedOwnItems().length === 0) return;
+      state.upgradeStep = UPGRADE_STEP_TARGET;
+      renderTargetChips();
+      updateUpgradeStepLayout();
+      refreshUpgradeState();
+    });
+  }
+
+  if (backBtn) {
+    backBtn.addEventListener("click", () => {
+      if (state.isSpinning) return;
+      state.upgradeStep = UPGRADE_STEP_SOURCE;
+      updateUpgradeStepLayout();
+      refreshUpgradeState();
+    });
+  }
+
   if (historyClear) {
     historyClear.addEventListener("click", clearHistory);
   }
@@ -2116,6 +2324,7 @@ function setupUpgradeUiControls() {
   }
 
   state.upgradesUiBound = true;
+  updateUpgradeStepLayout();
 }
 
 function renderOnboarding() {
@@ -2265,11 +2474,74 @@ function formatTonFromNano(nanoValue) {
 
 function normalizeTonChainId(chainValue) {
   const raw = String(chainValue ?? "").trim();
-  return raw || "";
+  if (!raw) return "";
+
+  const lower = raw.toLowerCase();
+  if (
+    lower === TON_CHAIN_MAINNET
+    || lower === "239"
+    || lower === "mainnet"
+    || lower === "main"
+    || lower === "livenet"
+  ) {
+    return TON_CHAIN_MAINNET;
+  }
+  if (
+    lower === TON_CHAIN_TESTNET
+    || lower === "3"
+    || lower === "testnet"
+    || lower === "test"
+    || lower === "sandbox"
+  ) {
+    return TON_CHAIN_TESTNET;
+  }
+
+  return raw;
 }
 
 function isTonTestnetChain(chainValue) {
   return normalizeTonChainId(chainValue) === TON_CHAIN_TESTNET;
+}
+
+function normalizeTonAddress(addressValue) {
+  const raw = String(addressValue ?? "").trim();
+  if (!raw) return "";
+
+  const matchRaw = raw.match(/^(-?\d+):([0-9a-fA-F]{64})$/);
+  if (matchRaw) {
+    return `${matchRaw[1]}:${matchRaw[2].toLowerCase()}`;
+  }
+
+  return raw;
+}
+
+function toStdBase64Address(text) {
+  return String(text ?? "").replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/g, "");
+}
+
+function toUrlSafeBase64Address(text) {
+  return String(text ?? "").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function getTonAddressCandidates(addressValue) {
+  const normalized = normalizeTonAddress(addressValue);
+  if (!normalized) return [];
+
+  const candidates = new Set([normalized]);
+  const isFriendlyLike = /^[A-Za-z0-9_\-+/=]{40,70}$/.test(normalized) && !normalized.includes(":");
+  if (isFriendlyLike) {
+    candidates.add(toStdBase64Address(normalized));
+    candidates.add(toUrlSafeBase64Address(normalized));
+  }
+
+  return Array.from(candidates).map((item) => String(item).trim()).filter(Boolean);
+}
+
+function getTonChainLookupOrder(chainValue) {
+  const normalized = normalizeTonChainId(chainValue);
+  if (normalized === TON_CHAIN_TESTNET) return [TON_CHAIN_TESTNET, TON_CHAIN_MAINNET];
+  if (normalized === TON_CHAIN_MAINNET) return [TON_CHAIN_MAINNET, TON_CHAIN_TESTNET];
+  return [TON_CHAIN_MAINNET, TON_CHAIN_TESTNET];
 }
 
 function resolveTonApiBase(chainValue) {
@@ -2307,27 +2579,67 @@ async function fetchJsonWithTimeout(url, timeoutMs = 9000, requestInit = null) {
 }
 
 async function fetchWalletTonBalance(address, chain = "") {
-  const normalized = String(address || "").trim();
-  if (!normalized) return null;
-  const encoded = encodeURIComponent(normalized);
-  const tonApiBase = resolveTonApiBase(chain);
-  const tonCenterBase = resolveTonCenterBase(chain);
+  const normalizedAddress = normalizeTonAddress(address);
+  if (!normalizedAddress) return null;
 
-  const tonApiData = await fetchJsonWithTimeout(`${tonApiBase}/accounts/${encoded}`);
-  const tonApiBalance = tonApiData?.balance;
-  if (tonApiBalance !== undefined && tonApiBalance !== null) {
-    const parsed = formatTonFromNano(tonApiBalance);
-    if (parsed !== null) return parsed;
+  const addressCandidates = getTonAddressCandidates(normalizedAddress);
+  const normalizedChain = normalizeTonChainId(chain);
+  const chainOrder = normalizedChain ? getTonChainLookupOrder(normalizedChain) : getTonChainLookupOrder("");
+  const preferSingleChain = Boolean(normalizedChain);
+  let bestUnknownBalance = null;
+
+  for (let chainIndex = 0; chainIndex < chainOrder.length; chainIndex += 1) {
+    const chainCandidate = chainOrder[chainIndex];
+    const tonApiBase = resolveTonApiBase(chainCandidate);
+    const tonCenterBase = resolveTonCenterBase(chainCandidate);
+
+    for (const candidateAddress of addressCandidates) {
+      const encoded = encodeURIComponent(candidateAddress);
+      let tonApiData = await fetchJsonWithTimeout(`${tonApiBase}/accounts/${encoded}`);
+      if (!tonApiData) {
+        tonApiData = await fetchJsonWithTimeout(`${tonApiBase}/accounts/${encoded}`);
+      }
+      const tonApiBalance = tonApiData?.balance;
+      if (tonApiBalance !== undefined && tonApiBalance !== null) {
+        const parsed = formatTonFromNano(tonApiBalance);
+        if (parsed !== null) {
+          if (preferSingleChain) return parsed;
+          const numeric = toNumber(parsed, NaN);
+          if (!Number.isFinite(numeric)) return parsed;
+          if (!bestUnknownBalance || numeric > bestUnknownBalance.numeric) {
+            bestUnknownBalance = { parsed, numeric };
+          }
+        }
+      }
+    }
+
+    for (const candidateAddress of addressCandidates) {
+      const encoded = encodeURIComponent(candidateAddress);
+      let tonCenterData = await fetchJsonWithTimeout(`${tonCenterBase}/getAddressInformation?address=${encoded}`);
+      if (!tonCenterData) {
+        tonCenterData = await fetchJsonWithTimeout(`${tonCenterBase}/getAddressInformation?address=${encoded}`);
+      }
+      const tonCenterBalance = tonCenterData?.result?.balance;
+      if (tonCenterData?.ok && tonCenterBalance !== undefined && tonCenterBalance !== null) {
+        const parsed = formatTonFromNano(tonCenterBalance);
+        if (parsed !== null) {
+          if (preferSingleChain) return parsed;
+          const numeric = toNumber(parsed, NaN);
+          if (!Number.isFinite(numeric)) return parsed;
+          if (!bestUnknownBalance || numeric > bestUnknownBalance.numeric) {
+            bestUnknownBalance = { parsed, numeric };
+          }
+        }
+      }
+    }
+
+    if (preferSingleChain && chainIndex === 0) {
+      // Explicit chain was requested; fallback chain is used only if primary failed.
+      continue;
+    }
   }
 
-  const tonCenterData = await fetchJsonWithTimeout(`${tonCenterBase}/getAddressInformation?address=${encoded}`);
-  const tonCenterBalance = tonCenterData?.result?.balance;
-  if (tonCenterData?.ok && tonCenterBalance !== undefined && tonCenterBalance !== null) {
-    const parsed = formatTonFromNano(tonCenterBalance);
-    if (parsed !== null) return parsed;
-  }
-
-  return null;
+  return bestUnknownBalance?.parsed ?? null;
 }
 
 function parseTokenAmount(rawValue, decimals = 9) {
@@ -2399,48 +2711,118 @@ function isLikelyVideoUrl(url) {
     || raw.includes("video");
 }
 
+function isLikelyImageAnimationUrl(url) {
+  const raw = String(url ?? "").trim().toLowerCase();
+  if (!raw) return false;
+  return /(\.gif|\.webp|\.apng)([\?#].*)?$/.test(raw)
+    || raw.includes("gif");
+}
+
 function isUnsupportedAnimationUrl(url) {
   const raw = String(url ?? "").trim().toLowerCase();
   if (!raw) return false;
   return /(\.tgs|\.json)([\?#].*)?$/.test(raw);
 }
 
-function pickNftAnimationUrl(item) {
+function pickNftAnimationCandidates(item) {
   const metadata = item?.metadata ?? {};
-  return normalizeMediaUrl(firstNonEmptyString(
+  const previews = safeArray(item?.previews);
+  const previewAnimations = [];
+  previews.forEach((preview) => {
+    const url = String(preview?.url ?? "").trim();
+    if (!url) return;
+    const mime = String(preview?.mime_type ?? preview?.mimeType ?? preview?.type ?? "").toLowerCase();
+    if (mime.includes("video") || mime.includes("gif") || isLikelyVideoUrl(url) || isLikelyImageAnimationUrl(url)) {
+      pushUniqueMediaCandidate(previewAnimations, url);
+    }
+  });
+
+  return normalizeMediaCandidateList(
     metadata.animation_url,
     metadata.animationUrl,
     metadata.animation,
     metadata.video,
     metadata.video_url,
     metadata.videoUrl,
+    metadata.preview_animation,
+    metadata.previewAnimation,
+    metadata.preview_video,
+    metadata.previewVideo,
+    metadata.gif,
+    metadata.gif_url,
+    metadata.gifUrl,
     metadata.lottie,
     metadata.lottie_url,
     metadata.lottieUrl,
     metadata.tgs,
+    metadata.media,
+    metadata.preview,
     item?.animation_url,
     item?.animationUrl,
     item?.video_url,
     item?.videoUrl,
-  ));
+    item?.preview_video_url,
+    item?.previewVideoUrl,
+    item?.gif_url,
+    item?.gifUrl,
+    item?.previews,
+    previewAnimations,
+  );
 }
 
-function pickBestPreviewUrl(item) {
+function pickNftAnimationUrl(item) {
+  return pickNftAnimationCandidates(item)[0] || "";
+}
+
+function pickNftImageCandidates(item) {
   const previews = safeArray(item?.previews);
-  const bySize = previews.find((preview) => preview?.resolution === "500x500")
-    ?? previews.find((preview) => preview?.resolution === "100x100")
-    ?? previews.find((preview) => preview?.resolution === "1500x1500")
-    ?? previews[0];
+  const previewImages = [];
+
+  const orderedResolutions = ["1500x1500", "1000x1000", "500x500", "300x300", "100x100"];
+  orderedResolutions.forEach((resolution) => {
+    previews.forEach((preview) => {
+      const url = String(preview?.url ?? "").trim();
+      if (!url) return;
+      if (String(preview?.resolution ?? "").trim() !== resolution) return;
+      const mime = String(preview?.mime_type ?? preview?.mimeType ?? preview?.type ?? "").toLowerCase();
+      if (mime.includes("video") || isLikelyVideoUrl(url)) return;
+      pushUniqueMediaCandidate(previewImages, url);
+    });
+  });
+
+  previews.forEach((preview) => {
+    const url = String(preview?.url ?? "").trim();
+    if (!url) return;
+    const mime = String(preview?.mime_type ?? preview?.mimeType ?? preview?.type ?? "").toLowerCase();
+    if (mime.includes("video") || isLikelyVideoUrl(url)) return;
+    pushUniqueMediaCandidate(previewImages, url);
+  });
+
   const metadata = item?.metadata ?? {};
-  const metadataImage = firstNonEmptyString(
+  return normalizeMediaCandidateList(
+    previewImages,
     metadata.image,
     metadata.image_url,
     metadata.imageUrl,
     metadata.thumbnail,
     metadata.poster,
+    metadata.preview,
+    metadata.preview_image,
+    metadata.preview_url,
+    metadata.media,
+    item?.image,
+    item?.image_url,
+    item?.imageUrl,
+    item?.preview,
+    item?.preview_url,
+    item?.previewUrl,
+    item?.photo_url,
+    item?.photoUrl,
   );
-  const previewUrl = String(bySize?.url ?? "").trim();
-  return normalizeMediaUrl(previewUrl || metadataImage);
+}
+
+function pickBestPreviewUrl(item) {
+  return pickNftImageCandidates(item)[0] || "";
 }
 
 function pickNftBackgroundColor(item) {
@@ -2499,15 +2881,19 @@ function deriveNftTier(item) {
 function buildNftModelFromTonapiItem(item, value, fallbackId) {
   const id = String(item?.address || fallbackId || "");
   if (!id) return null;
-  const animationUrl = pickNftAnimationUrl(item);
-  const imageUrl = pickBestPreviewUrl(item);
+  const animationCandidates = pickNftAnimationCandidates(item).filter((url) => !isUnsupportedAnimationUrl(url));
+  const imageCandidates = pickNftImageCandidates(item);
+  const animationUrl = animationCandidates[0] || "";
+  const imageUrl = imageCandidates[0] || "";
   return {
     id,
     name: deriveNftName(item),
     tier: deriveNftTier(item),
     value,
     imageUrl,
+    imageCandidates,
     animationUrl: !isUnsupportedAnimationUrl(animationUrl) ? animationUrl : "",
+    animationCandidates,
     backgroundColor: pickNftBackgroundColor(item),
     backgroundImageUrl: pickNftBackgroundImageUrl(item),
     collectionAddress: String(item?.collection?.address ?? "").trim(),
@@ -2516,76 +2902,615 @@ function buildNftModelFromTonapiItem(item, value, fallbackId) {
   };
 }
 
+function readPathValue(source, path) {
+  if (!source || typeof source !== "object") return undefined;
+  const segments = String(path || "").split(".").filter(Boolean);
+  let cursor = source;
+  for (const segment of segments) {
+    if (!cursor || typeof cursor !== "object") return undefined;
+    cursor = cursor[segment];
+  }
+  return cursor;
+}
+
+function firstNonEmptyStringFromPaths(source, paths) {
+  for (const path of safeArray(paths)) {
+    const text = String(readPathValue(source, path) ?? "").trim();
+    if (text) return text;
+  }
+  return "";
+}
+
+function collectMediaCandidatesFromPaths(source, paths) {
+  const result = [];
+  safeArray(paths).forEach((path) => {
+    const value = readPathValue(source, path);
+    if (value === undefined || value === null) return;
+    const normalized = normalizeMediaCandidateList(value);
+    normalized.forEach((entry) => pushUniqueMediaCandidate(result, entry));
+  });
+  return result;
+}
+
+function firstFiniteNumberFromPaths(source, paths) {
+  for (const path of safeArray(paths)) {
+    const value = readPathValue(source, path);
+    const number = toNumber(value, NaN);
+    if (Number.isFinite(number)) return number;
+  }
+  return NaN;
+}
+
+function firstMeaningfulValueFromPaths(source, paths) {
+  for (const path of safeArray(paths)) {
+    const value = readPathValue(source, path);
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string" && !value.trim()) continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+    return value;
+  }
+  return undefined;
+}
+
+function normalizeGiftColor(rawValue) {
+  if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+    const hex = Math.max(0, Math.floor(rawValue)).toString(16).padStart(6, "0").slice(-6);
+    return `#${hex}`;
+  }
+  const raw = String(rawValue ?? "").trim();
+  if (!raw) return "";
+  if (/^#?[0-9a-f]{3,8}$/i.test(raw)) {
+    return raw.startsWith("#") ? raw : `#${raw}`;
+  }
+  return normalizeColorValue(raw);
+}
+
+function appendGiftColorCandidates(target, rawValue, depth = 0) {
+  if (depth > 3 || rawValue === undefined || rawValue === null) return;
+
+  if (Array.isArray(rawValue)) {
+    rawValue.forEach((entry) => appendGiftColorCandidates(target, entry, depth + 1));
+    return;
+  }
+
+  if (typeof rawValue === "object") {
+    const colorKeys = [
+      "color",
+      "hex",
+      "value",
+      "start",
+      "end",
+      "from",
+      "to",
+      "center_color",
+      "centerColor",
+      "edge_color",
+      "edgeColor",
+      "top_color",
+      "topColor",
+      "bottom_color",
+      "bottomColor",
+      "left_color",
+      "leftColor",
+      "right_color",
+      "rightColor",
+      "accent_color",
+      "accentColor",
+    ];
+    colorKeys.forEach((key) => appendGiftColorCandidates(target, rawValue[key], depth + 1));
+    return;
+  }
+
+  const normalized = normalizeGiftColor(rawValue);
+  if (normalized) target.push(normalized);
+}
+
+function buildGiftGradient(rawPalette) {
+  const palette = [];
+  appendGiftColorCandidates(palette, rawPalette, 0);
+  const unique = Array.from(new Set(palette)).slice(0, 5);
+  if (unique.length < 2) return "";
+  return `linear-gradient(145deg, ${unique.join(", ")})`;
+}
+
+function parseLooseTonValue(rawValue) {
+  if (rawValue === undefined || rawValue === null) return NaN;
+
+  if (typeof rawValue === "number") {
+    return Number.isFinite(rawValue) ? rawValue : NaN;
+  }
+
+  if (typeof rawValue === "string") {
+    const cleaned = rawValue.replace(",", ".").replace(/\s+/g, " ").trim();
+    if (!cleaned) return NaN;
+    const match = cleaned.match(/-?\d+(?:\.\d+)?/);
+    if (!match) return NaN;
+    return toNumber(match[0], NaN);
+  }
+
+  if (typeof rawValue !== "object") return NaN;
+
+  const nanoCandidate = firstMeaningfulValueFromPaths(rawValue, [
+    "nano",
+    "nanos",
+    "nanoton",
+    "nanotons",
+    "value_nano",
+    "valueNano",
+  ]);
+  if (nanoCandidate !== undefined) {
+    const parsedNano = parseTokenAmount(nanoCandidate, 9);
+    if (Number.isFinite(parsedNano)) return parsedNano;
+  }
+
+  const nodePrice = parseTonPriceNode(rawValue);
+  if (Number.isFinite(nodePrice)) return nodePrice;
+
+  const currencyHint = String(
+    firstNonEmptyStringFromPaths(rawValue, [
+      "currency",
+      "currency_code",
+      "currencyCode",
+      "unit",
+      "symbol",
+      "asset",
+      "token",
+    ]),
+  ).trim().toLowerCase();
+  if (currencyHint && !currencyHint.includes("ton")) {
+    return NaN;
+  }
+
+  const nestedCandidate = firstMeaningfulValueFromPaths(rawValue, [
+    "amount",
+    "value",
+    "price",
+    "ton",
+    "tons",
+    "price_ton",
+    "priceTon",
+  ]);
+  if (nestedCandidate === undefined) return NaN;
+  return parseLooseTonValue(nestedCandidate);
+}
+
+function resolveBooleanFromPaths(source, paths) {
+  for (const path of safeArray(paths)) {
+    const value = readPathValue(source, path);
+    if (value === undefined || value === null) continue;
+    if (typeof value === "boolean") return value;
+    const text = String(value).trim().toLowerCase();
+    if (!text) continue;
+    if (["1", "true", "yes", "y", "on"].includes(text)) return true;
+    if (["0", "false", "no", "n", "off"].includes(text)) return false;
+  }
+  return false;
+}
+
+function isLikelyUpgradedTelegramGift(item) {
+  if (!item || typeof item !== "object") return false;
+  if (resolveBooleanFromPaths(item, ["is_upgraded", "isUpgraded", "gift.is_upgraded", "gift.isUpgraded"])) return true;
+  if (resolveBooleanFromPaths(item, ["is_unique", "isUnique", "gift.is_unique", "gift.isUnique"])) return true;
+  if (String(item?.nft_address ?? item?.nftAddress ?? "").trim()) return true;
+  if (String(readPathValue(item, "nft.address") ?? "").trim()) return true;
+  if (String(readPathValue(item, "gift.nft_address") ?? "").trim()) return true;
+  if (String(readPathValue(item, "unique_gift.nft_address") ?? "").trim()) return true;
+  if (String(readPathValue(item, "gift.unique_gift.nft_address") ?? "").trim()) return true;
+  if (String(readPathValue(item, "gift.number") ?? "").trim()) return true;
+  return false;
+}
+
+function isLikelyGiftRecord(item) {
+  if (!item || typeof item !== "object") return false;
+  if (isLikelyUpgradedTelegramGift(item)) return true;
+  if (readPathValue(item, "gift")) return true;
+  if (readPathValue(item, "unique_gift")) return true;
+  if (readPathValue(item, "gift.unique_gift")) return true;
+  if (String(item?.name ?? item?.title ?? "").trim()) return true;
+  if (String(item?.image_url ?? item?.preview_url ?? "").trim()) return true;
+  return false;
+}
+
+function extractTelegramGiftItems(payload) {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+
+  const candidates = [
+    payload?.gifts,
+    payload?.items,
+    payload?.result,
+    payload?.data?.gifts,
+    payload?.data?.items,
+    payload?.data?.result,
+    payload?.response?.gifts,
+    payload?.response?.items,
+    payload?.payload?.gifts,
+    payload?.payload?.items,
+  ];
+
+  for (const candidate of candidates) {
+    const items = safeArray(candidate);
+    if (items.length === 0) continue;
+    if (items.some((entry) => isLikelyGiftRecord(entry))) return items;
+    if (items.length > 0) return items;
+  }
+
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== "object") continue;
+    const nested = safeArray(
+      candidate.gifts
+      ?? candidate.items
+      ?? candidate.result
+      ?? candidate.data?.gifts
+      ?? candidate.data?.items,
+    );
+    if (nested.length === 0) continue;
+    if (nested.some((entry) => isLikelyGiftRecord(entry))) return nested;
+    return nested;
+  }
+
+  return [];
+}
+
 function buildNftModelFromTelegramGift(item, index) {
-  const giftId = String(
-    item?.nft_address
-    ?? item?.nftAddress
-    ?? item?.id
-    ?? item?.gift_id
-    ?? item?.giftId
-    ?? `tg-gift-${index + 1}`,
-  ).trim();
+  const fallbackFingerprint = firstNonEmptyStringFromPaths(item, [
+    "nft.address",
+    "gift.nft_address",
+    "gift.number",
+    "number",
+    "gift.id",
+    "id",
+    "name",
+    "title",
+    "preview_url",
+    "image_url",
+  ]);
+  const fallbackSlug = String(fallbackFingerprint || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 72);
+
+  const giftId = firstNonEmptyString(
+    firstNonEmptyStringFromPaths(item, [
+      "nft_address",
+      "nftAddress",
+      "nft.address",
+      "gift.nft_address",
+      "gift.nftAddress",
+      "gift.nft.address",
+      "unique_gift.nft_address",
+      "uniqueGift.nftAddress",
+      "id",
+      "gift_id",
+      "giftId",
+      "gift.id",
+      "gift.gift_id",
+      "unique_gift.id",
+      "uniqueGift.id",
+      "token_id",
+      "tokenId",
+      "nft.id",
+      "nft.token_id",
+      "number",
+      "gift.number",
+      "nft.number",
+      "unique_gift.number",
+      "gift.unique_gift.number",
+    ]),
+    fallbackSlug ? `tg-gift-${fallbackSlug}` : "",
+    `tg-gift-${index + 1}`,
+  );
   if (!giftId) return null;
 
-  const animationUrl = normalizeMediaUrl(firstNonEmptyString(
-    item?.animation_url,
-    item?.animationUrl,
-    item?.video_url,
-    item?.videoUrl,
-    item?.media_url,
-    item?.mediaUrl,
-  ));
+  const animationCandidates = collectMediaCandidatesFromPaths(item, [
+    "animation_url",
+    "animationUrl",
+    "video_url",
+    "videoUrl",
+    "gif_url",
+    "gifUrl",
+    "media_url",
+    "mediaUrl",
+    "media.animation",
+    "media.video",
+    "media.gif",
+    "media.animation_url",
+    "media.video_url",
+    "media.gif_url",
+    "preview.animation",
+    "preview.video",
+    "preview.gif",
+    "preview.animation_url",
+    "preview.video_url",
+    "nft.animation_url",
+    "nft.video_url",
+    "nft.preview.video_url",
+    "nft.preview.animation_url",
+    "nft.preview.video",
+    "nft.preview.animation",
+    "gift.animation_url",
+    "gift.video_url",
+    "gift.preview.video_url",
+    "gift.preview.animation_url",
+    "gift.preview.video",
+    "gift.preview.animation",
+    "gift.media.animation_url",
+    "gift.media.video_url",
+    "unique_gift.animation_url",
+    "unique_gift.video_url",
+    "gift.unique_gift.animation_url",
+    "gift.unique_gift.video_url",
+    "model.animation_url",
+    "model.video_url",
+    "model.gif_url",
+    "gift.model.animation_url",
+    "gift.model.video_url",
+    "gift.model.gif_url",
+    "unique_gift.model.animation_url",
+    "unique_gift.model.video_url",
+    "sticker.animation_url",
+    "sticker.video_url",
+    "sticker.gif_url",
+    "fragment.animation_url",
+    "fragment.video_url",
+  ]);
 
-  const imageUrl = normalizeMediaUrl(firstNonEmptyString(
-    item?.image_url,
-    item?.imageUrl,
-    item?.photo_url,
-    item?.photoUrl,
-    item?.thumbnail_url,
-    item?.thumbnailUrl,
-    item?.preview_url,
-    item?.previewUrl,
-  ));
+  const imageCandidates = collectMediaCandidatesFromPaths(item, [
+    "image_url",
+    "imageUrl",
+    "photo_url",
+    "photoUrl",
+    "thumbnail_url",
+    "thumbnailUrl",
+    "preview_url",
+    "previewUrl",
+    "preview.image_url",
+    "preview.image",
+    "preview.url",
+    "preview.src",
+    "media.preview_url",
+    "media.thumbnail_url",
+    "media.image_url",
+    "media.image.url",
+    "media.url",
+    "media.content_url",
+    "nft.image_url",
+    "nft.image",
+    "nft.preview_url",
+    "nft.preview.image_url",
+    "nft.preview.url",
+    "nft.media.image_url",
+    "gift.image_url",
+    "gift.photo_url",
+    "gift.preview_url",
+    "gift.preview.image_url",
+    "gift.preview.url",
+    "gift.media.url",
+    "gift.media.image_url",
+    "gift.nft.image_url",
+    "gift.nft.preview_url",
+    "unique_gift.preview_url",
+    "unique_gift.preview.image_url",
+    "gift.unique_gift.preview_url",
+    "gift.unique_gift.preview.image_url",
+    "gift.unique_gift.model.image_url",
+    "model.image_url",
+    "model.preview_url",
+    "model.media_url",
+    "model.sticker_url",
+    "sticker.url",
+    "sticker.image_url",
+    "sticker.thumbnail_url",
+    "fragment.image_url",
+    "fragment.preview_url",
+    "fragment.preview.url",
+  ]);
 
-  const priceTon = toNumber(
-    item?.price_ton
-    ?? item?.priceTon
-    ?? item?.ton_price
-    ?? item?.tonPrice
-    ?? item?.value,
-    NaN,
+  const previewMixedCandidates = normalizeMediaCandidateList(
+    readPathValue(item, "previews"),
+    readPathValue(item, "preview.items"),
+    readPathValue(item, "gift.previews"),
+    readPathValue(item, "gift.preview.items"),
+    readPathValue(item, "nft.previews"),
+    readPathValue(item, "nft.preview.items"),
   );
+  previewMixedCandidates.forEach((url) => {
+    if (isLikelyVideoUrl(url) || isLikelyImageAnimationUrl(url)) {
+      pushUniqueMediaCandidate(animationCandidates, url);
+    } else {
+      pushUniqueMediaCandidate(imageCandidates, url);
+    }
+  });
 
-  const isFromBlockchain = Boolean(item?.is_from_blockchain ?? item?.isFromBlockchain);
+  const animationUrl = animationCandidates.find((url) => !isUnsupportedAnimationUrl(url)) || "";
+  const imageUrl = imageCandidates[0] || "";
+
+  const rawPriceNode = firstMeaningfulValueFromPaths(item, [
+    "sale.price",
+    "market.price",
+    "fragment.price",
+    "price",
+    "gift.price",
+    "nft.price",
+    "auction.price",
+    "listing.price",
+  ]);
+
+  let priceTon = parseTonPriceNode(rawPriceNode);
+  if (!Number.isFinite(priceTon)) {
+    priceTon = firstFiniteNumberFromPaths(item, [
+      "price_ton",
+      "priceTon",
+      "ton_price",
+      "tonPrice",
+      "value",
+      "price",
+      "market.price_ton",
+      "market.floor_ton",
+      "market.floor_price_ton",
+      "market.ton_price",
+      "fragment.price_ton",
+      "fragment.floor_ton",
+      "fragment.floor_price_ton",
+      "nft.price_ton",
+      "nft.market_price_ton",
+      "gift.price_ton",
+      "gift.market_price_ton",
+      "listing.price_ton",
+      "auction.price_ton",
+    ]);
+  }
+  if (!Number.isFinite(priceTon)) {
+    priceTon = parseLooseTonValue(firstMeaningfulValueFromPaths(item, [
+      "price",
+      "market.price",
+      "fragment.price",
+      "sale.price",
+      "sale.price.value",
+      "gift.price",
+      "gift.market.price",
+      "nft.price",
+      "nft.market.price",
+      "valuation.ton",
+      "market.floor_price",
+    ]));
+  }
+  if (Number.isFinite(priceTon) && priceTon > 1000000) {
+    priceTon = priceTon / 1000000000;
+  }
+
+  const isFromBlockchain = resolveBooleanFromPaths(item, [
+    "is_from_blockchain",
+    "isFromBlockchain",
+    "nft.is_from_blockchain",
+    "gift.is_from_blockchain",
+  ]);
   const normalizedTier = String(
-    item?.tier
-    ?? item?.rarity
-    ?? (item?.is_unique || item?.isUnique ? "Rare" : "Common"),
+    firstNonEmptyStringFromPaths(item, [
+      "tier",
+      "rarity",
+      "nft.rarity",
+      "gift.rarity",
+      "model.rarity",
+      "gift.model.rarity",
+      "unique_gift.rarity",
+      "gift.unique_gift.rarity",
+    ])
+    || ((isLikelyUpgradedTelegramGift(item) || isFromBlockchain) ? "Rare" : "Common"),
   ).trim() || "Common";
+
+  const explicitBgColor = normalizeGiftColor(firstNonEmptyStringFromPaths(item, [
+    "background_color",
+    "backgroundColor",
+    "bg_color",
+    "bgColor",
+    "background.color",
+    "theme.background_color",
+    "backdrop.background_color",
+    "backdrop.center_color",
+    "backdrop.centerColor",
+    "gift.background_color",
+    "gift.backdrop.background_color",
+    "gift.backdrop.center_color",
+    "gift.theme.background_color",
+  ]));
+
+  const paletteSource = firstMeaningfulValueFromPaths(item, [
+    "background.colors",
+    "background.palette",
+    "background.gradient_colors",
+    "background.gradient",
+    "theme.colors",
+    "theme.palette",
+    "theme.gradient",
+    "backdrop.colors",
+    "backdrop.palette",
+    "backdrop.gradient",
+    "gift.background.colors",
+    "gift.theme.colors",
+    "gift.backdrop.colors",
+    "gift.backdrop.palette",
+    "gift.backdrop.gradient",
+    "unique_gift.backdrop.colors",
+    "model.background.colors",
+  ]);
+  const gradientBg = buildGiftGradient(paletteSource);
+
+  const backgroundImageUrl = normalizeMediaUrl(firstNonEmptyStringFromPaths(item, [
+    "background_image",
+    "backgroundImage",
+    "pattern_url",
+    "patternUrl",
+    "background.image_url",
+    "background.image.url",
+    "background.pattern_url",
+    "background.pattern.url",
+    "theme.background_image",
+    "theme.pattern_url",
+    "preview.background_image",
+    "preview.pattern_url",
+    "gift.background_image",
+    "gift.background.image_url",
+    "gift.background.pattern_url",
+    "nft.background_image",
+    "backdrop.image_url",
+    "backdrop.pattern_url",
+    "backdrop.url",
+    "gift.backdrop.image_url",
+    "gift.backdrop.pattern_url",
+    "gift.backdrop.url",
+    "model.background_image_url",
+    "model.backdrop_url",
+    "fragment.background_url",
+    "fragment.pattern_url",
+  ]));
+
+  const giftName = String(
+    firstNonEmptyStringFromPaths(item, [
+      "name",
+      "title",
+      "nft.name",
+      "gift.name",
+      "gift.title",
+      "model.name",
+      "gift.model.name",
+      "unique_gift.name",
+      "gift.unique_gift.name",
+      "base_name",
+      "gift.base_name",
+      "collection_name",
+      "gift.collection_name",
+    ]) || "Telegram Gift",
+  ).trim() || "Telegram Gift";
 
   return {
     id: giftId,
-    name: String(item?.name ?? item?.title ?? "Telegram Gift").trim() || "Telegram Gift",
+    name: giftName,
     tier: normalizedTier,
     value: Number.isFinite(priceTon) && priceTon > 0 ? priceTon : NaN,
     imageUrl,
+    imageCandidates,
     animationUrl: !isUnsupportedAnimationUrl(animationUrl) ? animationUrl : "",
-    backgroundColor: normalizeColorValue(
-      item?.background_color
-      ?? item?.backgroundColor
-      ?? item?.bg_color
-      ?? item?.bgColor
-      ?? "",
+    animationCandidates: animationCandidates.filter((url) => !isUnsupportedAnimationUrl(url)),
+    backgroundColor: explicitBgColor,
+    backgroundGradient: gradientBg,
+    backgroundImageUrl,
+    collectionAddress: String(
+      firstNonEmptyStringFromPaths(item, [
+        "collection.address",
+        "nft.collection.address",
+        "gift.collection.address",
+      ]) || "telegram-gifts",
     ),
-    backgroundImageUrl: normalizeMediaUrl(firstNonEmptyString(
-      item?.background_image,
-      item?.backgroundImage,
-      item?.pattern_url,
-      item?.patternUrl,
-    )),
-    collectionAddress: "telegram-gifts",
-    listed: Boolean(item?.listed ?? false),
-    source: isFromBlockchain ? "wallet" : "telegram",
+    listed: resolveBooleanFromPaths(item, [
+      "listed",
+      "market.listed",
+      "fragment.listed",
+      "sale.active",
+      "listing.active",
+    ]),
+    source: "telegram",
   };
 }
 
@@ -2603,33 +3528,106 @@ function mergeUniqueNfts(...lists) {
       const prev = map.get(id);
       const prevHasPrice = Number.isFinite(toNumber(prev?.value, NaN)) && toNumber(prev?.value, NaN) > 0;
       const nextHasPrice = Number.isFinite(toNumber(item?.value, NaN)) && toNumber(item?.value, NaN) > 0;
+      const merged = { ...prev };
+
       if (!prevHasPrice && nextHasPrice) {
-        map.set(id, { ...prev, ...item });
+        merged.value = item.value;
       }
+
+      const mergedImageCandidates = normalizeMediaCandidateList(
+        prev?.imageCandidates,
+        prev?.imageUrl,
+        item?.imageCandidates,
+        item?.imageUrl,
+      );
+      if (mergedImageCandidates.length > 0) {
+        merged.imageCandidates = mergedImageCandidates;
+        if (!merged.imageUrl) {
+          merged.imageUrl = mergedImageCandidates[0];
+        }
+      }
+
+      const mergedAnimationCandidates = normalizeMediaCandidateList(
+        prev?.animationCandidates,
+        prev?.animationUrl,
+        item?.animationCandidates,
+        item?.animationUrl,
+      ).filter((url) => !isUnsupportedAnimationUrl(url));
+      if (mergedAnimationCandidates.length > 0) {
+        merged.animationCandidates = mergedAnimationCandidates;
+        if (!merged.animationUrl || isUnsupportedAnimationUrl(merged.animationUrl)) {
+          merged.animationUrl = mergedAnimationCandidates[0];
+        }
+      }
+
+      const patchIfMissing = [
+        "name",
+        "tier",
+        "imageUrl",
+        "animationUrl",
+        "imageCandidates",
+        "animationCandidates",
+        "backgroundColor",
+        "backgroundGradient",
+        "backgroundImageUrl",
+        "collectionAddress",
+      ];
+      patchIfMissing.forEach((key) => {
+        if (!merged[key] && item?.[key]) {
+          merged[key] = item[key];
+        }
+      });
+
+      if (item?.listed && !merged?.listed) {
+        merged.listed = true;
+      }
+
+      if ((merged?.source === "wallet" || !merged?.source) && item?.source === "telegram") {
+        merged.source = "telegram";
+      }
+
+      map.set(id, merged);
     });
   });
   return Array.from(map.values());
 }
 
 async function fetchTelegramProfileGifts(ownerAddress = "") {
-  const endpoint = TELEGRAM_GIFTS_ENDPOINT;
   const userId = String(state.currentUser?.id ?? "").trim();
-  if (!endpoint || !userId) return [];
+  const ownerWallet = normalizeTonAddress(ownerAddress);
 
-  let url;
-  try {
-    url = new URL(endpoint, window.location.href);
-  } catch {
-    return [];
+  const injectedItems = extractTelegramGiftItems(window.__UPNFT_TELEGRAM_GIFTS__);
+  const injectedUpgraded = injectedItems.filter((item) => isLikelyUpgradedTelegramGift(item));
+  let mergedInjected = (injectedUpgraded.length > 0 ? injectedUpgraded : injectedItems)
+    .map((item, index) => buildNftModelFromTelegramGift(item, index))
+    .filter(Boolean);
+
+  if (!userId) return mergedInjected;
+
+  const endpointCandidates = [];
+  const pushEndpoint = (value) => {
+    const endpoint = String(value ?? "").trim();
+    if (!endpoint) return;
+    if (!endpointCandidates.includes(endpoint)) {
+      endpointCandidates.push(endpoint);
+    }
+  };
+
+  pushEndpoint(state.telegramGiftsEndpoint);
+  pushEndpoint(TELEGRAM_GIFTS_ENDPOINT);
+
+  const apiBase = String(UPGRADE_API_BASE || "").trim().replace(/\/$/, "");
+  if (apiBase) {
+    pushEndpoint(`${apiBase}/telegram/gifts`);
+    pushEndpoint(`${apiBase}/telegram-gifts`);
+    pushEndpoint(`${apiBase}/gifts`);
   }
 
-  url.searchParams.set("user_id", userId);
-  if (state.currentUser?.username) {
-    url.searchParams.set("username", String(state.currentUser.username).trim());
-  }
-  if (ownerAddress) {
-    url.searchParams.set("wallet", String(ownerAddress).trim());
-  }
+  pushEndpoint("/api/telegram/gifts");
+  pushEndpoint("/api/telegram-gifts");
+  pushEndpoint("/api/gifts");
+
+  if (endpointCandidates.length === 0) return mergedInjected;
 
   const initData = String(window.Telegram?.WebApp?.initData ?? "").trim();
   const headers = {};
@@ -2637,48 +3635,133 @@ async function fetchTelegramProfileGifts(ownerAddress = "") {
     headers["X-Telegram-Init-Data"] = initData;
   }
 
-  const payload = await fetchJsonWithTimeout(
-    url.toString(),
-    12000,
-    Object.keys(headers).length ? { headers } : null,
-  );
+  const requestVariants = [
+    {
+      scope: "all",
+      source: "all",
+      includeWallet: true,
+      wallet: ownerWallet,
+    },
+    {
+      scope: "profile",
+      source: "telegram",
+      includeWallet: false,
+      wallet: "",
+    },
+  ];
 
-  if (!payload) return [];
-  const items = safeArray(payload?.gifts ?? payload?.items ?? payload?.result);
-  return items
-    .map((item, index) => buildNftModelFromTelegramGift(item, index))
-    .filter(Boolean);
+  if (!ownerWallet) {
+    requestVariants.shift();
+  }
+
+  const uniqueVariants = requestVariants.filter((variant, index, array) => {
+    const key = `${variant.scope}|${variant.source}|${variant.wallet}`;
+    return array.findIndex((entry) => `${entry.scope}|${entry.source}|${entry.wallet}` === key) === index;
+  });
+
+  for (const endpoint of endpointCandidates) {
+    let endpointMerged = [];
+    let endpointResponded = false;
+
+    for (const variant of uniqueVariants) {
+      let url;
+      try {
+        url = new URL(endpoint, window.location.href);
+      } catch {
+        continue;
+      }
+
+      url.searchParams.set("user_id", userId);
+      if (state.currentUser?.username) {
+        url.searchParams.set("username", String(state.currentUser.username).trim());
+      }
+      if (variant.wallet) {
+        url.searchParams.set("wallet", variant.wallet);
+        url.searchParams.set("wallet_address", variant.wallet);
+      }
+      const rawOwnerWallet = String(ownerAddress ?? "").trim();
+      if (rawOwnerWallet && rawOwnerWallet !== variant.wallet) {
+        url.searchParams.set("wallet_raw", rawOwnerWallet);
+      }
+      if (ownerWallet) {
+        url.searchParams.set("connected_wallet", ownerWallet);
+      }
+      url.searchParams.set("upgraded_only", "1");
+      url.searchParams.set("include_upgraded", "1");
+      url.searchParams.set("include_profile", "1");
+      url.searchParams.set("include_wallet", variant.includeWallet ? "1" : "0");
+      url.searchParams.set("scope", variant.scope);
+      url.searchParams.set("source", variant.source);
+
+      const payload = await fetchJsonWithTimeout(
+        url.toString(),
+        12000,
+        Object.keys(headers).length ? { headers } : null,
+      );
+      if (!payload) continue;
+      endpointResponded = true;
+
+      const items = extractTelegramGiftItems(payload);
+      const upgradedItems = items.filter((entry) => isLikelyUpgradedTelegramGift(entry));
+      const sourceItems = upgradedItems.length > 0 ? upgradedItems : items;
+      const models = sourceItems
+        .map((entry, index) => buildNftModelFromTelegramGift(entry, index))
+        .filter(Boolean);
+      endpointMerged = mergeUniqueNfts(endpointMerged, models);
+    }
+
+    if (!endpointResponded) continue;
+    state.telegramGiftsEndpoint = endpoint;
+
+    if (endpointMerged.length > 0) {
+      return mergeUniqueNfts(mergedInjected, endpointMerged);
+    }
+  }
+
+  return mergedInjected;
 }
 
 async function fetchAccountNftItemsPage(owner, indirectOwnership, chain = "") {
-  const encodedOwner = encodeURIComponent(owner);
-  const collected = [];
-  let offset = 0;
-  let hadResponse = false;
   const indirectParam = typeof indirectOwnership === "boolean" ? `&indirect_ownership=${indirectOwnership}` : "";
-  const tonApiBase = resolveTonApiBase(chain);
+  const tonApiBase = resolveTonApiBase(normalizeTonChainId(chain));
+  const ownerCandidates = getTonAddressCandidates(owner);
+  let fallbackEmpty = null;
 
-  for (let page = 0; page < NFT_MAX_PAGES; page += 1) {
-    const url = `${tonApiBase}/accounts/${encodedOwner}/nfts?limit=${NFT_PAGE_LIMIT}&offset=${offset}${indirectParam}`;
-    const payload = await fetchJsonWithTimeout(url, 12000);
-    if (!payload) {
-      if (!hadResponse) return null;
-      break;
+  for (const ownerCandidate of ownerCandidates) {
+    const encodedOwner = encodeURIComponent(ownerCandidate);
+    const collected = [];
+    let offset = 0;
+    let hadResponse = false;
+
+    for (let page = 0; page < NFT_MAX_PAGES; page += 1) {
+      const url = `${tonApiBase}/accounts/${encodedOwner}/nfts?limit=${NFT_PAGE_LIMIT}&offset=${offset}${indirectParam}`;
+      let payload = await fetchJsonWithTimeout(url, 12000);
+      if (!payload) {
+        payload = await fetchJsonWithTimeout(url, 12000);
+      }
+      if (!payload) {
+        if (!hadResponse) break;
+        break;
+      }
+      hadResponse = true;
+
+      const chunk = safeArray(payload?.nft_items);
+      if (chunk.length === 0) break;
+      collected.push(...chunk);
+      if (chunk.length < NFT_PAGE_LIMIT) break;
+      offset += NFT_PAGE_LIMIT;
     }
-    hadResponse = true;
 
-    const chunk = safeArray(payload?.nft_items);
-    if (chunk.length === 0) break;
-    collected.push(...chunk);
-    if (chunk.length < NFT_PAGE_LIMIT) break;
-    offset += NFT_PAGE_LIMIT;
+    if (!hadResponse) continue;
+    if (collected.length > 0) return collected;
+    fallbackEmpty = collected;
   }
 
-  return collected;
+  return fallbackEmpty;
 }
 
 async function fetchAccountNftItems(address, chain = "") {
-  const owner = String(address || "").trim();
+  const owner = normalizeTonAddress(address);
   if (!owner) return [];
 
   // Try multiple TonAPI ownership modes because behavior differs across wallets.
@@ -2704,7 +3787,8 @@ async function fetchCollectionMarketSnapshot(collectionAddress, ownerAddress, ch
     return { collectionAddress: "", floorTon: null, listings: [] };
   }
 
-  const tonApiBase = resolveTonApiBase(chain);
+  const tonApiBase = resolveTonApiBase(normalizeTonChainId(chain));
+  const ownerAddressVariants = new Set(getTonAddressCandidates(ownerAddress).map((item) => item.toLowerCase()));
   const url = `${tonApiBase}/nfts/collections/${encodeURIComponent(collection)}/items?limit=${COLLECTION_SCAN_LIMIT}&offset=0`;
   const payload = await fetchJsonWithTimeout(url, 12000);
   const items = safeArray(payload?.nft_items);
@@ -2719,7 +3803,7 @@ async function fetchCollectionMarketSnapshot(collectionAddress, ownerAddress, ch
     floorTon = floorTon === null ? priceTon : Math.min(floorTon, priceTon);
 
     const itemOwner = String(item?.owner?.address ?? "").trim();
-    if (itemOwner && itemOwner === ownerAddress) continue;
+    if (itemOwner && ownerAddressVariants.has(itemOwner.toLowerCase())) continue;
 
     const mapped = buildNftModelFromTonapiItem(item, priceTon, `market-${collection}-${index}`);
     if (mapped) listings.push(mapped);
@@ -2797,33 +3881,58 @@ function normalizeBackendNft(rawNft, fallbackTarget = null) {
 
   const name = String(raw.name ?? raw.title ?? fallback.name ?? "").trim();
   const value = toNumber(raw.value ?? raw.price ?? fallback.value, NaN);
-  const animationUrl = normalizeMediaUrl(firstNonEmptyString(
+  const animationCandidates = normalizeMediaCandidateList(
+    raw.animationCandidates,
+    raw.animation_candidates,
     raw.animationUrl,
     raw.animation_url,
     raw.videoUrl,
     raw.video_url,
+    raw.preview_video_url,
+    raw.previewVideoUrl,
+    raw.gif_url,
+    raw.gifUrl,
     raw.animation,
     raw.video,
+    raw.gif,
+    raw.media,
+    raw.preview,
+    fallback.animationCandidates,
     fallback.animationUrl,
-  ));
+  ).filter((url) => !isUnsupportedAnimationUrl(url));
+  const animationUrl = animationCandidates[0] || "";
 
   if (!name || !Number.isFinite(value) || value < 0) return null;
+
+  const imageCandidates = normalizeMediaCandidateList(
+    raw.imageCandidates,
+    raw.image_candidates,
+    raw.imageUrl,
+    raw.image_url,
+    raw.image,
+    raw.photo_url,
+    raw.photoUrl,
+    raw.preview,
+    raw.preview_url,
+    raw.previewUrl,
+    raw.thumbnail_url,
+    raw.thumbnailUrl,
+    raw.poster,
+    raw.media,
+    fallback.imageCandidates,
+    fallback.imageUrl,
+  );
+  const imageUrl = imageCandidates[0] || "";
 
   return {
     id: String(raw.id ?? fallback.id ?? `reward-${Date.now()}`),
     name,
     tier: String(raw.tier ?? raw.rarity ?? fallback.tier ?? "Unknown"),
     value,
-    imageUrl: normalizeMediaUrl(firstNonEmptyString(
-      raw.imageUrl,
-      raw.image_url,
-      raw.image,
-      raw.photo_url,
-      raw.photoUrl,
-      raw.preview,
-      fallback.imageUrl,
-    )),
+    imageUrl,
+    imageCandidates,
     animationUrl: !isUnsupportedAnimationUrl(animationUrl) ? animationUrl : "",
+    animationCandidates,
     backgroundColor: normalizeColorValue(
       raw.backgroundColor
       ?? raw.background_color
@@ -3029,9 +4138,11 @@ async function resolveUpgradeViaBackend({ source, target, chance, onQueueUpdate 
   }
 
   const requestId = createClientRequestId();
+  const sourceIds = safeArray(source?.sourceIds).map((id) => String(id ?? "").trim()).filter(Boolean);
+  const primarySourceId = sourceIds[0] || source?.id || "";
   const binding = {
     requestId,
-    sourceId: source?.id ?? "",
+    sourceId: primarySourceId,
     targetId: target?.id ?? "",
     wallet: state.tonAddress,
     userId: state.currentUser?.id ?? "",
@@ -3042,7 +4153,9 @@ async function resolveUpgradeViaBackend({ source, target, chance, onQueueUpdate 
     username: state.currentUser?.username ?? "",
     wallet: state.tonAddress || "",
     client_request_id: requestId,
-    source_nft_id: source?.id ?? "",
+    source_nft_id: primarySourceId,
+    source_nft_ids: sourceIds,
+    source_bundle_size: sourceIds.length || 1,
     target_nft_id: target?.id ?? "",
     source_value: toNumber(source?.value, 0),
     target_value: toNumber(target?.value, 0),
@@ -3170,7 +4283,7 @@ async function resolveUpgradeViaBackend({ source, target, chance, onQueueUpdate 
 }
 
 async function fetchWalletMarketData(address, chain = "") {
-  const ownerAddress = String(address || "").trim();
+  const ownerAddress = normalizeTonAddress(address);
   if (!ownerAddress) {
     return {
       profileInventory: [],
@@ -3289,32 +4402,56 @@ function normalizeNftList(rawList, prefix) {
     .map((item, index) => {
       const name = String(item?.name ?? item?.title ?? "").trim();
       const value = toNumber(item?.value ?? item?.price, NaN);
-      const animationUrl = normalizeMediaUrl(firstNonEmptyString(
+      const animationCandidates = normalizeMediaCandidateList(
+        item?.animationCandidates,
+        item?.animation_candidates,
         item?.animationUrl,
         item?.animation_url,
         item?.videoUrl,
         item?.video_url,
+        item?.preview_video_url,
+        item?.previewVideoUrl,
+        item?.gif_url,
+        item?.gifUrl,
         item?.animation,
         item?.video,
-      ));
+        item?.gif,
+        item?.media,
+        item?.preview,
+      ).filter((url) => !isUnsupportedAnimationUrl(url));
+      const animationUrl = animationCandidates[0] || "";
 
       if (!name || !Number.isFinite(value) || value < 0) {
         return null;
       }
+
+      const imageCandidates = normalizeMediaCandidateList(
+        item?.imageCandidates,
+        item?.image_candidates,
+        item?.imageUrl,
+        item?.image_url,
+        item?.image,
+        item?.photo_url,
+        item?.photoUrl,
+        item?.preview,
+        item?.preview_url,
+        item?.previewUrl,
+        item?.thumbnail_url,
+        item?.thumbnailUrl,
+        item?.poster,
+        item?.media,
+      );
+      const imageUrl = imageCandidates[0] || "";
 
       return {
         id: String(item?.id ?? `${prefix}-${index + 1}`),
         name,
         tier: String(item?.tier ?? "Unknown"),
         value,
-        imageUrl: normalizeMediaUrl(firstNonEmptyString(
-          item?.imageUrl,
-          item?.image,
-          item?.photo_url,
-          item?.photoUrl,
-          item?.preview,
-        )),
+        imageUrl,
+        imageCandidates,
         animationUrl: !isUnsupportedAnimationUrl(animationUrl) ? animationUrl : "",
+        animationCandidates,
         backgroundColor: normalizeColorValue(
           item?.backgroundColor
           ?? item?.background_color
@@ -3416,12 +4553,53 @@ async function loadAppData() {
   ensureSelectedIds();
 }
 
+function getSelectedOwnItems() {
+  const selected = new Set(safeArray(state.selectedOwnIds).map((id) => String(id).trim()).filter(Boolean));
+  return state.data.inventory.filter((item) => selected.has(String(item?.id ?? "").trim()));
+}
+
+function getSelectedSourceAggregate() {
+  const selectedItems = getSelectedOwnItems();
+  if (selectedItems.length === 0) return null;
+
+  const totalValue = selectedItems.reduce((sum, item) => {
+    const value = toNumber(item?.value, 0);
+    return Number.isFinite(value) ? sum + value : sum;
+  }, 0);
+  const topTierItem = selectedItems.reduce((best, item) => {
+    if (!best) return item;
+    const currentWeight = toNumber(tierWeight[item?.tier], 1);
+    const bestWeight = toNumber(tierWeight[best?.tier], 1);
+    return currentWeight > bestWeight ? item : best;
+  }, null);
+
+  return {
+    id: selectedItems[0]?.id ?? "",
+    sourceIds: selectedItems.map((item) => item.id),
+    name: selectedItems.length === 1 ? selectedItems[0].name : `${selectedItems.length} NFT`,
+    value: totalValue,
+    tier: topTierItem?.tier || selectedItems[0]?.tier || "Common",
+    items: selectedItems,
+  };
+}
+
 function ensureSelectedIds() {
-  if (!byId(state.data.inventory, state.selectedOwnId)) {
-    state.selectedOwnId = state.data.inventory[0]?.id ?? null;
+  const inventoryIds = new Set(state.data.inventory.map((item) => String(item.id)));
+  state.selectedOwnIds = safeArray(state.selectedOwnIds)
+    .map((id) => String(id ?? "").trim())
+    .filter((id) => inventoryIds.has(id))
+    .slice(0, MAX_UPGRADE_SOURCE_NFTS);
+  state.selectedOwnId = state.selectedOwnIds[0] ?? null;
+
+  if (state.selectedOwnIds.length === 0) {
+    state.selectedTargetId = null;
+    if (state.upgradeStep === UPGRADE_STEP_TARGET) {
+      state.upgradeStep = UPGRADE_STEP_SOURCE;
+    }
+    return;
   }
 
-  const source = byId(state.data.inventory, state.selectedOwnId);
+  const source = getSelectedSourceAggregate();
   const eligibleTargets = getEligibleTargetsForSource(source, state.data.targets);
   if (!byId(eligibleTargets, state.selectedTargetId)) {
     state.selectedTargetId = eligibleTargets[0]?.id ?? null;
@@ -3486,12 +4664,25 @@ function createTonIcon() {
   return iconWrap;
 }
 
-function resolveNftMediaUrl(nft) {
-  const animationUrl = String(nft?.animationUrl ?? "").trim();
-  if (animationUrl && !isUnsupportedAnimationUrl(animationUrl)) {
-    return animationUrl;
-  }
-  return String(nft?.imageUrl ?? "").trim();
+function resolveNftMediaSpec(nft) {
+  const animationCandidates = normalizeMediaCandidateList(
+    nft?.animationCandidates,
+    nft?.animationUrl,
+  ).filter((url) => !isUnsupportedAnimationUrl(url));
+
+  const imageCandidates = normalizeMediaCandidateList(
+    nft?.imageCandidates,
+    nft?.imageUrl,
+  );
+
+  const animationUrl = animationCandidates[0] || "";
+  const imageUrl = imageCandidates[0] || "";
+  return {
+    animationUrl,
+    animationCandidates,
+    imageUrl,
+    imageCandidates,
+  };
 }
 
 function createNftPriceBadge(value) {
@@ -3507,40 +4698,175 @@ function createNftPriceBadge(value) {
   return badge;
 }
 
-function createNftMediaNode(mediaUrl, nftName) {
-  if (!mediaUrl) return null;
-
-  if (isLikelyVideoUrl(mediaUrl)) {
-    const video = document.createElement("video");
-    video.className = "nft-media";
-    video.src = mediaUrl;
-    video.autoplay = true;
-    video.loop = true;
-    video.muted = true;
-    video.playsInline = true;
-    video.setAttribute("webkit-playsinline", "");
-    video.setAttribute("playsinline", "");
-    video.setAttribute("aria-hidden", "true");
-    video.preload = "metadata";
-    return video;
-  }
+function createNftImageMediaNode(mediaUrls, nftName) {
+  const candidates = normalizeMediaCandidateList(mediaUrls);
+  if (candidates.length === 0) return null;
 
   const img = document.createElement("img");
   img.className = "nft-media";
-  img.src = mediaUrl;
   img.alt = nftName || "NFT";
   img.loading = "lazy";
   img.decoding = "async";
   img.referrerPolicy = "no-referrer";
+
+  let index = 0;
+  const applyCandidate = (nextIndex) => {
+    index = nextIndex;
+    img.src = candidates[index];
+  };
+
+  img.addEventListener("error", () => {
+    if (index + 1 >= candidates.length) {
+      img.dispatchEvent(new CustomEvent("nft:image-exhausted"));
+      return;
+    }
+    applyCandidate(index + 1);
+  });
+
+  applyCandidate(0);
   return img;
+}
+
+function createNftVideoMediaNode(mediaUrls, posterUrls = []) {
+  const videoCandidates = normalizeMediaCandidateList(mediaUrls)
+    .filter((url) => !isLikelyImageAnimationUrl(url));
+  if (videoCandidates.length === 0) return null;
+
+  const posterCandidates = normalizeMediaCandidateList(posterUrls);
+  const video = document.createElement("video");
+  video.className = "nft-media is-video";
+  video.autoplay = true;
+  video.loop = true;
+  video.muted = true;
+  video.playsInline = true;
+  video.setAttribute("webkit-playsinline", "");
+  video.setAttribute("playsinline", "");
+  video.setAttribute("aria-hidden", "true");
+  video.preload = "auto";
+
+  if (posterCandidates.length > 0) {
+    video.poster = posterCandidates[0];
+  }
+
+  let index = 0;
+  let exhausted = false;
+  let stallTimerId = null;
+  const clearStallTimer = () => {
+    if (stallTimerId) {
+      clearTimeout(stallTimerId);
+      stallTimerId = null;
+    }
+  };
+  const emitExhausted = () => {
+    if (exhausted) return;
+    exhausted = true;
+    clearStallTimer();
+    video.dispatchEvent(new CustomEvent("nft:video-exhausted"));
+  };
+  const applyCandidate = (nextIndex) => {
+    clearStallTimer();
+    if (nextIndex >= videoCandidates.length) {
+      emitExhausted();
+      return;
+    }
+    index = nextIndex;
+    video.src = videoCandidates[index];
+    video.load();
+  };
+  const switchToNext = () => {
+    if (exhausted) return;
+    applyCandidate(index + 1);
+  };
+
+  video.addEventListener("error", switchToNext);
+  video.addEventListener("loadeddata", clearStallTimer);
+  video.addEventListener("playing", clearStallTimer);
+  video.addEventListener("stalled", () => {
+    if (exhausted) return;
+    clearStallTimer();
+    stallTimerId = window.setTimeout(() => {
+      switchToNext();
+    }, 1500);
+  });
+
+  applyCandidate(0);
+  return video;
+}
+
+function createNftMediaNode(nft) {
+  const spec = resolveNftMediaSpec(nft);
+  const imageCandidates = spec.imageCandidates;
+  const animationCandidates = spec.animationCandidates;
+  const videoAnimations = animationCandidates.filter((url) => !isLikelyImageAnimationUrl(url));
+  const imageAnimations = animationCandidates.filter((url) => isLikelyImageAnimationUrl(url));
+  const nftName = nft?.name || "NFT";
+
+  const staticImageNode = () => createNftImageMediaNode(imageCandidates, nftName);
+  const animatedImageNode = () => {
+    const image = createNftImageMediaNode(imageAnimations, nftName);
+    if (image) image.classList.add("is-animated-image");
+    return image;
+  };
+
+  if (videoAnimations.length > 0) {
+    const video = createNftVideoMediaNode(videoAnimations, imageCandidates);
+    if (video) {
+      const fallbackToImage = () => {
+        if (video.dataset.fallbackApplied === "1") return;
+        video.dataset.fallbackApplied = "1";
+        const fallbackNode = animatedImageNode() || staticImageNode();
+        if (fallbackNode && video.parentNode) {
+          video.replaceWith(fallbackNode);
+        }
+      };
+
+      video.addEventListener("nft:video-exhausted", fallbackToImage, { once: true });
+      video.addEventListener("loadeddata", () => {
+        video.classList.add("is-ready");
+      }, { once: true });
+
+      return { node: video, isAnimated: true };
+    }
+  }
+
+  if (imageAnimations.length > 0) {
+    const animatedImage = animatedImageNode();
+    if (animatedImage) {
+      animatedImage.addEventListener("nft:image-exhausted", () => {
+        if (animatedImage.dataset.fallbackApplied === "1") return;
+        animatedImage.dataset.fallbackApplied = "1";
+        const fallbackNode = staticImageNode();
+        if (fallbackNode && animatedImage.parentNode) {
+          animatedImage.replaceWith(fallbackNode);
+        }
+      }, { once: true });
+      return { node: animatedImage, isAnimated: true };
+    }
+  }
+
+  const image = staticImageNode();
+  if (image) {
+    return { node: image, isAnimated: false };
+  }
+
+  return { node: null, isAnimated: false };
 }
 
 function createNftThumb(nft) {
   const thumb = document.createElement("div");
   thumb.className = "nft-thumb";
+  if (nft?.source === "telegram") {
+    thumb.classList.add("is-telegram");
+    if (!nft?.backgroundColor && !nft?.backgroundGradient && !nft?.backgroundImageUrl) {
+      thumb.classList.add("is-full-preview");
+    }
+  }
 
   if (nft.backgroundColor) {
     thumb.style.setProperty("--nft-bg-color", nft.backgroundColor);
+  }
+  if (nft.backgroundGradient) {
+    thumb.style.setProperty("--nft-bg-gradient", nft.backgroundGradient);
   }
 
   const bgLayer = document.createElement("div");
@@ -3560,10 +4886,21 @@ function createNftThumb(nft) {
     thumb.append(bgPattern);
   }
 
-  const mediaUrl = resolveNftMediaUrl(nft);
-  const mediaNode = createNftMediaNode(mediaUrl, nft.name);
-  if (mediaNode) {
-    thumb.append(mediaNode);
+  const media = createNftMediaNode(nft);
+  if (media?.isAnimated) {
+    thumb.classList.add("has-animation");
+    const animationBadge = document.createElement("span");
+    animationBadge.className = "nft-anim-badge";
+    animationBadge.innerHTML = `
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <path d="M4 3.2v9.6l8-4.8z" />
+      </svg>
+      <span>LIVE</span>
+    `;
+    thumb.append(animationBadge);
+  }
+  if (media?.node) {
+    thumb.append(media.node);
   } else {
     const fallback = document.createElement("span");
     fallback.className = "nft-media-fallback";
@@ -3584,25 +4921,35 @@ function createNftCardBody(nft) {
 
   const title = document.createElement("strong");
   title.textContent = nft.name;
+  title.title = nft.name;
+
+  const subtitle = document.createElement("p");
+  subtitle.className = "nft-subtitle";
+  if (nft.listed) {
+    subtitle.textContent = t("nft_card_auction_soon");
+  } else {
+    subtitle.textContent = t("nft_card_owned");
+  }
 
   const meta = document.createElement("div");
   meta.className = "nft-meta";
 
   const tier = document.createElement("small");
-  tier.textContent = nft.tier || "NFT";
+  tier.textContent = String(nft.tier || "NFT").trim() || "NFT";
 
   const status = document.createElement("span");
-  status.className = `nft-status${nft.listed ? " is-listed" : ""}`;
-  if (nft.source === "telegram") {
-    status.textContent = t("nft_status_telegram");
-  } else if (nft.source === "bank") {
-    status.textContent = t("nft_status_bank");
-  } else {
-    status.textContent = nft.listed ? t("nft_status_market") : t("nft_status_wallet");
-  }
+  const sourceType = nft.source === "telegram"
+    ? "telegram"
+    : (nft.source === "bank" ? "bank" : "wallet");
+  status.className = `nft-status is-${sourceType}${nft.listed ? " is-listed" : ""}`;
+  status.textContent = nft.listed
+    ? t("nft_status_for_sale")
+    : (nft.source === "telegram"
+      ? t("nft_status_telegram")
+      : (nft.source === "bank" ? t("nft_status_bank") : t("nft_status_wallet")));
 
   meta.append(tier, status);
-  body.append(title, meta);
+  body.append(title, subtitle, meta);
   return body;
 }
 
@@ -3612,6 +4959,16 @@ function createOwnNftCard(nft, isActive) {
   card.className = `nft-card${isActive ? " is-active" : ""}`;
   card.dataset.id = nft.id;
   card.append(createNftThumb(nft), createNftCardBody(nft));
+  if (isActive) {
+    const check = document.createElement("span");
+    check.className = "nft-checkmark";
+    check.innerHTML = `
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <path d="m3.2 8.4 3 3.1 6.6-6.8" />
+      </svg>
+    `;
+    card.append(check);
+  }
   return card;
 }
 
@@ -3693,7 +5050,7 @@ function renderTargetChips() {
   ensureSelectedIds();
   const list = document.getElementById("target-nft-list");
   const emptyNode = document.getElementById("target-empty");
-  const source = byId(state.data.inventory, state.selectedOwnId);
+  const source = getSelectedSourceAggregate();
   const eligibleTargets = getEligibleTargetsForSource(source, state.data.targets);
   list.innerHTML = "";
 
@@ -3727,7 +5084,7 @@ function renderTargetChips() {
 
   if (emptyNode) {
     if (!source) {
-      emptyNode.textContent = t("note_select_nft");
+      emptyNode.textContent = t("note_pick_source", { count: MAX_UPGRADE_SOURCE_NFTS });
     } else if (state.data.targets.length > 0 && eligibleTargets.length === 0) {
       emptyNode.textContent = formatTargetLimitNote(getMaxTargetValueForSource(source));
     } else if (state.data.targets.length > 0) {
@@ -3757,14 +5114,14 @@ function renderOwnNftCards() {
   }
 
   if (readonlyFallback) {
+    state.selectedOwnIds = [];
     state.selectedOwnId = null;
-  } else if (!byId(displayList, state.selectedOwnId)) {
-    state.selectedOwnId = displayList[0]?.id ?? null;
   }
 
   appendInBatches(list, displayList, (nft) => {
     const canUseForUpgrade = pricedIds.has(nft.id);
-    const card = createOwnNftCard(nft, canUseForUpgrade && nft.id === state.selectedOwnId);
+    const isSelected = canUseForUpgrade && state.selectedOwnIds.includes(nft.id);
+    const card = createOwnNftCard(nft, isSelected);
 
     if (!canUseForUpgrade) {
       card.classList.add("is-readonly");
@@ -3773,9 +5130,15 @@ function renderOwnNftCards() {
 
     card.addEventListener("click", () => {
       if (state.isSpinning) return;
-      state.selectedOwnId = nft.id;
+      const changed = toggleSelectedSourceNft(nft.id);
+      if (!changed) return;
+      ensureSelectedIds();
+      if (state.upgradeStep === UPGRADE_STEP_TARGET && state.selectedOwnIds.length === 0) {
+        state.upgradeStep = UPGRADE_STEP_SOURCE;
+      }
       renderOwnNftCards();
       renderTargetChips();
+      updateUpgradeStepLayout();
       refreshUpgradeState();
     });
     return card;
@@ -3815,10 +5178,11 @@ function applyChanceOutcomeVisual() {
 
 function refreshUpgradeState() {
   ensureSelectedIds();
+  updateUpgradeStepLayout();
   clearUpgradeGuardExpired();
   syncUpgradeGuardTicker();
 
-  const source = byId(state.data.inventory, state.selectedOwnId);
+  const source = getSelectedSourceAggregate();
   const target = byId(state.data.targets, state.selectedTargetId);
   const chance = calculateChance(source, target);
   const secureBackendReady = Boolean(UPGRADE_API_BASE);
@@ -3857,7 +5221,17 @@ function refreshUpgradeState() {
   if (!source) {
     chanceRing.classList.add("is-empty");
     animateChanceTo(0, 460);
-    note.textContent = t("note_select_nft");
+    note.textContent = t("note_pick_source", { count: MAX_UPGRADE_SOURCE_NFTS });
+    button.disabled = true;
+    button.textContent = getUpgradeButtonLabel();
+    applyChanceOutcomeVisual();
+    return;
+  }
+
+  if (state.upgradeStep !== UPGRADE_STEP_TARGET) {
+    chanceRing.classList.add("is-empty");
+    animateChanceTo(0, 420);
+    note.textContent = t("note_pick_source", { count: MAX_UPGRADE_SOURCE_NFTS });
     button.disabled = true;
     button.textContent = getUpgradeButtonLabel();
     applyChanceOutcomeVisual();
@@ -3870,7 +5244,7 @@ function refreshUpgradeState() {
     chanceRing.classList.add("is-empty");
     animateChanceTo(0, 460);
     note.textContent = hasEligibleTargets
-      ? t("note_select_nft")
+      ? t("note_pick_target")
       : formatTargetLimitNote(maxTargetValue);
     button.disabled = true;
     button.textContent = getUpgradeButtonLabel();
@@ -3943,8 +5317,13 @@ function spinArrowToResult(targetAngle) {
 
 function applyUpgradeResult(success, source, target, landedAngle, chance, resultNode, options = {}) {
   const rewardMode = String(options.rewardMode ?? "nft").trim().toLowerCase();
-  state.data.inventory = state.data.inventory.filter((nft) => nft.id !== source.id);
-  state.data.profileInventory = state.data.profileInventory.filter((nft) => nft.id !== source.id);
+  const sourceIds = safeArray(source?.sourceIds).length > 0
+    ? safeArray(source?.sourceIds)
+    : [source?.id];
+  const sourceIdSet = new Set(sourceIds.map((id) => String(id ?? "").trim()).filter(Boolean));
+
+  state.data.inventory = state.data.inventory.filter((nft) => !sourceIdSet.has(String(nft?.id ?? "").trim()));
+  state.data.profileInventory = state.data.profileInventory.filter((nft) => !sourceIdSet.has(String(nft?.id ?? "").trim()));
   state.data.stats.upgradesTotal += 1;
 
   if (success && rewardMode !== "ton" && target) {
@@ -3961,6 +5340,10 @@ function applyUpgradeResult(success, source, target, landedAngle, chance, result
   }
 
   state.upgradeOutcome = success ? "win" : "lose";
+  state.selectedOwnIds = [];
+  state.selectedOwnId = null;
+  state.selectedTargetId = null;
+  state.upgradeStep = UPGRADE_STEP_SOURCE;
   applyChanceOutcomeVisual();
   resultNode.classList.remove("success", "fail", "queued");
   resultNode.textContent = "";
@@ -3992,8 +5375,9 @@ function setupUpgradeFlow() {
       return;
     }
 
-    const source = byId(state.data.inventory, state.selectedOwnId);
+    const source = getSelectedSourceAggregate();
     const target = byId(state.data.targets, state.selectedTargetId);
+    if (state.upgradeStep !== UPGRADE_STEP_TARGET) return;
     if (!source || !target) return;
     if (!isTargetWithinUpgradeLimit(source, target)) {
       const maxTargetValue = getMaxTargetValueForSource(source);
@@ -4427,8 +5811,48 @@ function setupTonConnect() {
   const loadWalletNfts = async (address, chain = state.tonChain) => {
     const token = ++nftRequestToken;
     setWalletShort("wallet_syncing_nft");
-    const marketData = await fetchWalletMarketData(address, chain);
+    const normalizedChain = normalizeTonChainId(chain);
+    const fallbackChain = normalizedChain === TON_CHAIN_TESTNET ? TON_CHAIN_MAINNET : TON_CHAIN_TESTNET;
+
+    let effectiveChain = chain;
+    let marketData = await fetchWalletMarketData(address, chain);
     if (token !== nftRequestToken) return null;
+
+    const shouldTryFallback = !marketData
+      || (
+        safeArray(marketData?.profileInventory).length === 0
+        && safeArray(marketData?.inventory).length === 0
+      );
+    if (shouldTryFallback && fallbackChain && fallbackChain !== normalizedChain) {
+      const fallbackData = await fetchWalletMarketData(address, fallbackChain);
+      if (token !== nftRequestToken) return null;
+      if (fallbackData) {
+        if (!marketData) {
+          marketData = fallbackData;
+          effectiveChain = fallbackChain;
+        } else {
+          const currentProfile = safeArray(marketData.profileInventory);
+          const currentInventory = safeArray(marketData.inventory);
+          const currentTargets = safeArray(marketData.targets);
+          const nextProfile = safeArray(fallbackData.profileInventory);
+          const nextInventory = safeArray(fallbackData.inventory);
+          const nextTargets = safeArray(fallbackData.targets);
+
+          marketData = {
+            profileInventory: mergeUniqueNfts(currentProfile, nextProfile),
+            inventory: mergeUniqueNfts(currentInventory, nextInventory),
+            targets: mergeUniqueNfts(currentTargets, nextTargets)
+              .filter((item) => Number.isFinite(toNumber(item?.value, NaN)) && toNumber(item?.value, NaN) > 0)
+              .sort((left, right) => left.value - right.value)
+              .slice(0, MAX_TARGETS),
+          };
+
+          if (nextProfile.length > currentProfile.length) {
+            effectiveChain = fallbackChain;
+          }
+        }
+      }
+    }
 
     if (!marketData) {
       setWalletShort("wallet_nft_load_error");
@@ -4437,7 +5861,7 @@ function setupTonConnect() {
 
     let preferredTargets = safeArray(marketData.targets);
     try {
-      const bankTargets = await fetchBankWalletTargets(chain);
+      const bankTargets = await fetchBankWalletTargets(effectiveChain);
       if (token !== nftRequestToken) return null;
       if (bankTargets.length > 0) {
         preferredTargets = bankTargets;
@@ -4636,27 +6060,34 @@ function setupTonConnect() {
 }
 
 async function bootstrap() {
-  fixMojibakeInDom(document);
-  loadPersistentData();
-  recordAnalytics("launches");
-  setNetworkStatus("idle");
-  monitorNetworkFreshness();
-  await prepareFairState();
-  setupDeviceProfileWatcher();
-  setupTabs();
-  setupTelegramUser();
-  setupLocalization();
-  setupProfileCopyActions();
-  setOrbitAngle(state.orbitAngle);
-  paintChance(state.displayedChance);
-  setupUpgradeFlow();
+  markBootSplashStart();
+  try {
+    fixMojibakeInDom(document);
+    loadPersistentData();
+    recordAnalytics("launches");
+    setNetworkStatus("idle");
+    monitorNetworkFreshness();
+    await prepareFairState();
+    setupDeviceProfileWatcher();
+    setupTabs();
+    setupTelegramUser();
+    setupLocalization();
+    setupProfileCopyActions();
+    setOrbitAngle(state.orbitAngle);
+    paintChance(state.displayedChance);
+    setupUpgradeFlow();
 
-  renderAll();
-  await loadAppData();
-  renderAll();
-  setNetworkStatus(state.network.online ? "ready" : "offline", state.network.online ? "network_done" : "network_offline");
-  setupTonConnect();
-  scheduleLayoutAnchors();
+    renderAll();
+    await loadAppData();
+    renderAll();
+    setNetworkStatus(state.network.online ? "ready" : "offline", state.network.online ? "network_done" : "network_offline");
+    setupTonConnect();
+    scheduleLayoutAnchors();
+  } finally {
+    await hideBootSplash();
+  }
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error("Bootstrap error:", error);
+});
