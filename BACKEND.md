@@ -7,6 +7,9 @@ Minimal backend for your current Mini App frontend.
 - `POST /upgrade/prepare`
 - `POST /upgrade/resolve`
 - `POST /upgrade/abort`
+- `GET /wallet/balance`
+- `GET /bank/targets`
+- `GET /market/state`
 - `GET /telegram/gifts`
 - `GET /telegram-gifts`
 - `GET /gifts`
@@ -32,6 +35,19 @@ Backend URL:
 ```text
 http://localhost:8787
 ```
+
+Key aggregation endpoint:
+
+```text
+GET /market/state?user_id=...&username=...&wallet=...&chain=...
+```
+
+Returns:
+
+- `balance_ton`
+- `profile_inventory` (wallet + Telegram profile gifts)
+- `inventory` (priced NFT for upgrade source)
+- `targets` (market targets, prefers bank wallet targets)
 
 ## Connect frontend to backend
 

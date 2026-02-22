@@ -16,7 +16,11 @@ services:
       STAKE_AMOUNT_NANO: "1"
       BANK_WALLET: "UQCgQQSGPlFWr5TY8UVT7XvtkVtNkRPIGUEnFOB4gRZbQEu4"
       TONAPI_BASE: "https://tonapi.io/v2"
+      TONCENTER_BASE: "https://toncenter.com/api/v2"
+      TONAPI_TESTNET_BASE: "https://testnet.tonapi.io/v2"
+      TONCENTER_TESTNET_BASE: "https://testnet.toncenter.com/api/v2"
       TONAPI_TIMEOUT_MS: "12000"
+      MAX_TARGETS: "60"
       # Optional external profile-gifts provider URL (returns gifts/items/result array).
       # TELEGRAM_GIFTS_PROVIDER_URL: "https://your-provider.example.com/telegram/gifts"
       # Optional bearer token for provider.

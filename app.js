@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-76";
+const APP_VERSION = "2026-02-22-77";
 
 const tabMeta = {
   tasks: {
@@ -2578,9 +2578,122 @@ async function fetchJsonWithTimeout(url, timeoutMs = 9000, requestInit = null) {
   }
 }
 
+function createUpgradeApiUrl(path, query = {}) {
+  const base = String(UPGRADE_API_BASE || "").trim().replace(/\/$/, "");
+  if (!base) return null;
+  try {
+    const url = new URL(`${base}${path.startsWith("/") ? path : `/${path}`}`);
+    const entries = query && typeof query === "object" ? Object.entries(query) : [];
+    entries.forEach(([key, rawValue]) => {
+      if (rawValue === undefined || rawValue === null) return;
+      const value = String(rawValue).trim();
+      if (!value) return;
+      url.searchParams.set(key, value);
+    });
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchUpgradeApiJson(path, query = {}, timeoutMs = 12000) {
+  const url = createUpgradeApiUrl(path, query);
+  if (!url) return null;
+  const initData = String(window.Telegram?.WebApp?.initData ?? "").trim();
+  const headers = {};
+  if (initData) {
+    headers["X-Telegram-Init-Data"] = initData;
+  }
+  return fetchJsonWithTimeout(
+    url.toString(),
+    timeoutMs,
+    Object.keys(headers).length ? { headers } : null,
+  );
+}
+
+function formatTonNumber(value) {
+  const numeric = toNumber(value, NaN);
+  if (!Number.isFinite(numeric) || numeric < 0) return null;
+  if (numeric === 0) return "0";
+  return numeric.toFixed(6).replace(/\.?0+$/, "");
+}
+
+async function fetchBackendWalletBalance(address, chain = "") {
+  if (!UPGRADE_API_BASE) return null;
+  const wallet = normalizeTonAddress(address);
+  if (!wallet) return null;
+  const payload = await fetchUpgradeApiJson("/wallet/balance", {
+    wallet,
+    wallet_address: wallet,
+    connected_wallet: wallet,
+    chain: normalizeTonChainId(chain),
+  });
+  if (!payload || payload.ok === false) return null;
+  const backendBalance = toNumber(payload.balance_ton ?? payload.balanceTon, NaN);
+  return formatTonNumber(backendBalance);
+}
+
+async function fetchBackendMarketState(address, chain = "") {
+  if (!UPGRADE_API_BASE) return null;
+  const wallet = normalizeTonAddress(address);
+  if (!wallet) return null;
+  const payload = await fetchUpgradeApiJson("/market/state", {
+    user_id: state.currentUser?.id ?? "",
+    username: state.currentUser?.username ?? "",
+    wallet,
+    wallet_address: wallet,
+    connected_wallet: wallet,
+    chain: normalizeTonChainId(chain),
+    include_upgraded: "1",
+    upgraded_only: "1",
+    include_profile: "1",
+    include_wallet: "1",
+  });
+  if (!payload || payload.ok === false) return null;
+  const profileInventory = normalizeNftList(
+    payload.profile_inventory ?? payload.profileInventory ?? [],
+    "api-prof",
+    { allowMissingPrice: true },
+  );
+  const inventory = normalizeNftList(
+    payload.inventory ?? payload.owned_inventory ?? payload.ownedInventory ?? [],
+    "api-inv",
+  );
+  const targets = normalizeNftList(
+    payload.targets ?? payload.market_targets ?? payload.marketTargets ?? [],
+    "api-target",
+  )
+    .filter((item) => Number.isFinite(toNumber(item?.value, NaN)) && toNumber(item?.value, NaN) > 0)
+    .sort((left, right) => left.value - right.value)
+    .slice(0, MAX_TARGETS);
+
+  return {
+    profileInventory,
+    inventory,
+    targets,
+  };
+}
+
+async function fetchBackendBankTargets(chain = "") {
+  if (!UPGRADE_API_BASE) return null;
+  const payload = await fetchUpgradeApiJson("/bank/targets", {
+    chain: normalizeTonChainId(chain),
+  });
+  if (!payload || payload.ok === false) return null;
+  return normalizeNftList(payload.targets ?? [], "api-bank-target")
+    .filter((item) => Number.isFinite(toNumber(item?.value, NaN)) && toNumber(item?.value, NaN) > 0)
+    .sort((left, right) => left.value - right.value)
+    .slice(0, MAX_TARGETS);
+}
+
 async function fetchWalletTonBalance(address, chain = "") {
   const normalizedAddress = normalizeTonAddress(address);
   if (!normalizedAddress) return null;
+
+  const backendBalance = await fetchBackendWalletBalance(normalizedAddress, chain);
+  if (backendBalance !== null) {
+    return backendBalance;
+  }
 
   const addressCandidates = getTonAddressCandidates(normalizedAddress);
   const normalizedChain = normalizeTonChainId(chain);
@@ -3874,6 +3987,11 @@ function buildOwnedInventoryLists(ownItems, floorByCollection, prefix = "owned",
 }
 
 async function fetchBankWalletTargets(chain = "") {
+  const backendTargets = await fetchBackendBankTargets(chain);
+  if (backendTargets) {
+    return backendTargets;
+  }
+
   const bankAddress = String(BANK_WALLET_ADDRESS || "").trim();
   if (!bankAddress) return [];
 
@@ -4323,6 +4441,11 @@ async function fetchWalletMarketData(address, chain = "") {
     };
   }
 
+  const backendState = await fetchBackendMarketState(ownerAddress, chain);
+  if (backendState) {
+    return backendState;
+  }
+
   const ownItems = await fetchAccountNftItems(ownerAddress, chain);
   const uniqueCollections = Array.from(
     new Set(
@@ -4427,11 +4550,15 @@ function normalizeDisplayName(name) {
   return raw.toLowerCase().replace(/(^|[\s-])\S/g, (letter) => letter.toUpperCase());
 }
 
-function normalizeNftList(rawList, prefix) {
+function normalizeNftList(rawList, prefix, options = {}) {
+  const allowMissingPrice = Boolean(options?.allowMissingPrice);
   return safeArray(rawList)
     .map((item, index) => {
       const name = String(item?.name ?? item?.title ?? "").trim();
-      const value = toNumber(item?.value ?? item?.price, NaN);
+      const rawValue = item?.value ?? item?.price;
+      const value = (rawValue === null || rawValue === undefined || rawValue === "")
+        ? NaN
+        : toNumber(rawValue, NaN);
       const animationCandidates = normalizeMediaCandidateList(
         item?.animationCandidates,
         item?.animation_candidates,
@@ -4451,9 +4578,11 @@ function normalizeNftList(rawList, prefix) {
       ).filter((url) => !isUnsupportedAnimationUrl(url));
       const animationUrl = animationCandidates[0] || "";
 
-      if (!name || !Number.isFinite(value) || value < 0) {
+      if (!name || (!allowMissingPrice && (!Number.isFinite(value) || value < 0))) {
         return null;
       }
+
+      const normalizedValue = Number.isFinite(value) && value >= 0 ? value : NaN;
 
       const imageCandidates = normalizeMediaCandidateList(
         item?.imageCandidates,
@@ -4477,7 +4606,7 @@ function normalizeNftList(rawList, prefix) {
         id: String(item?.id ?? `${prefix}-${index + 1}`),
         name,
         tier: String(item?.tier ?? "Unknown"),
-        value,
+        value: normalizedValue,
         imageUrl,
         imageCandidates,
         animationUrl: !isUnsupportedAnimationUrl(animationUrl) ? animationUrl : "",
