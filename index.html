@@ -12,11 +12,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=2026-02-22-9">
+  <link rel="stylesheet" href="./styles.css?v=2026-02-22-10">
 
   <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
   <script defer src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-  <script defer src="./app.js?v=2026-02-22-9"></script>
+  <script defer src="./app.js?v=2026-02-22-10"></script>
 </head>
 <body>
   <main class="app-shell">
@@ -44,8 +44,10 @@
 
           <div class="wheel-zone">
             <div id="chance-ring" class="chance-ring" style="--chance:0">
+              <div class="chance-track" aria-hidden="true"></div>
+              <div class="chance-sheen" aria-hidden="true"></div>
               <div class="chance-orbit">
-                <span class="orbit-arrow">➤</span>
+                <span class="orbit-arrow" aria-hidden="true"></span>
               </div>
               <div class="chance-core">
                 <strong id="chance-value">0%</strong>
