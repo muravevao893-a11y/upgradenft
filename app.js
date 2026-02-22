@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-7";
+const APP_VERSION = "2026-02-22-9";
 
 const tabMeta = {
   tasks: {
@@ -19,7 +19,7 @@ const tabMeta = {
   },
   profile: {
     title: "Вы",
-    subtitle: "Telegram-профиль и TON Wallet.",
+    subtitle: "Профиль",
   },
 };
 
