@@ -1,0 +1,20 @@
+services:
+  upnft-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: upnft-backend
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      PORT: "8787"
+      CORS_ORIGIN: "*"
+      SESSION_TTL_MS: "60000"
+      COOLDOWN_MS: "4500"
+      QUEUE_RETRY_MS: "1200"
+      STAKE_AMOUNT_NANO: "1"
+      BANK_WALLET: "UQCgQQSGPlFWr5TY8UVT7XvtkVtNkRPIGUEnFOB4gRZbQEu4"
+      # Optional: put JSON array here for Telegram gifts endpoint.
+      # TELEGRAM_GIFTS_JSON: "[]"
+

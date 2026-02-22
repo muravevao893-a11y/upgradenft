@@ -514,6 +514,8 @@ svg {
   font-weight: 700;
   line-height: 1.35;
   text-align: center;
+  width: 100%;
+  box-sizing: border-box;
   padding: 6px 10px;
   margin-inline: auto;
   max-width: min(92%, 560px);
@@ -530,6 +532,9 @@ svg {
   display: flex;
   align-items: center;
   justify-content: center;
+  align-self: stretch;
+  width: 100%;
+  max-width: none;
   margin: 0;
   font-size: clamp(18px, 4.9vw, 24px);
   line-height: 1.25;
@@ -2946,6 +2951,20 @@ body[data-device="mobile"] .bottom-nav {
   max-height: 42vh;
 }
 
+.app-shell[data-device="desktop"] .simple-screen .empty-note,
+.app-shell[data-device="desktop"] .profile-screen #my-empty,
+.app-shell[data-device="desktop"] .profile-screen #dropped-empty,
+.app-shell[data-device="desktop"] .upgrade-side-col #own-empty,
+.app-shell[data-device="desktop"] .target-block #target-empty {
+  width: 100%;
+  max-width: none;
+  align-self: stretch;
+  margin-inline: 0;
+  padding-inline: clamp(18px, 2.2vw, 30px);
+  text-align: center;
+  justify-content: center;
+}
+
 .app-shell[data-device="desktop"][data-layout="wide"] .simple-list {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -3195,6 +3214,19 @@ body[data-device="desktop"] .bottom-nav.is-hidden {
 
   .locale-list {
     max-height: 152px;
+  }
+
+  .simple-screen .empty-note,
+  .profile-screen #my-empty,
+  .profile-screen #dropped-empty,
+  .upgrade-side-col #own-empty {
+    width: 100%;
+    max-width: none;
+    align-self: stretch;
+    margin-inline: 0;
+    padding-inline: 18px;
+    text-align: center;
+    justify-content: center;
   }
 }
 

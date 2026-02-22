@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-71";
+const APP_VERSION = "2026-02-22-76";
 
 const tabMeta = {
   tasks: {
@@ -2584,14 +2584,27 @@ async function fetchWalletTonBalance(address, chain = "") {
 
   const addressCandidates = getTonAddressCandidates(normalizedAddress);
   const normalizedChain = normalizeTonChainId(chain);
-  const chainOrder = normalizedChain ? getTonChainLookupOrder(normalizedChain) : getTonChainLookupOrder("");
-  const preferSingleChain = Boolean(normalizedChain);
-  let bestUnknownBalance = null;
+  const primaryChain = normalizedChain || TON_CHAIN_MAINNET;
+  const fallbackChain = primaryChain === TON_CHAIN_TESTNET ? TON_CHAIN_MAINNET : TON_CHAIN_TESTNET;
+  const allowFallback = Boolean(normalizedChain);
 
-  for (let chainIndex = 0; chainIndex < chainOrder.length; chainIndex += 1) {
-    const chainCandidate = chainOrder[chainIndex];
+  const fetchBalanceForChain = async (chainCandidate) => {
     const tonApiBase = resolveTonApiBase(chainCandidate);
     const tonCenterBase = resolveTonCenterBase(chainCandidate);
+    let responded = false;
+    let best = null;
+
+    const rememberBalance = (parsed) => {
+      if (parsed === null) return;
+      const numeric = toNumber(parsed, NaN);
+      if (!best) {
+        best = { parsed, numeric };
+        return;
+      }
+      if (Number.isFinite(numeric) && (!Number.isFinite(best.numeric) || numeric > best.numeric)) {
+        best = { parsed, numeric };
+      }
+    };
 
     for (const candidateAddress of addressCandidates) {
       const encoded = encodeURIComponent(candidateAddress);
@@ -2599,17 +2612,12 @@ async function fetchWalletTonBalance(address, chain = "") {
       if (!tonApiData) {
         tonApiData = await fetchJsonWithTimeout(`${tonApiBase}/accounts/${encoded}`);
       }
+      if (tonApiData) {
+        responded = true;
+      }
       const tonApiBalance = tonApiData?.balance;
       if (tonApiBalance !== undefined && tonApiBalance !== null) {
-        const parsed = formatTonFromNano(tonApiBalance);
-        if (parsed !== null) {
-          if (preferSingleChain) return parsed;
-          const numeric = toNumber(parsed, NaN);
-          if (!Number.isFinite(numeric)) return parsed;
-          if (!bestUnknownBalance || numeric > bestUnknownBalance.numeric) {
-            bestUnknownBalance = { parsed, numeric };
-          }
-        }
+        rememberBalance(formatTonFromNano(tonApiBalance));
       }
     }
 
@@ -2619,27 +2627,48 @@ async function fetchWalletTonBalance(address, chain = "") {
       if (!tonCenterData) {
         tonCenterData = await fetchJsonWithTimeout(`${tonCenterBase}/getAddressInformation?address=${encoded}`);
       }
+      if (tonCenterData) {
+        responded = true;
+      }
       const tonCenterBalance = tonCenterData?.result?.balance;
       if (tonCenterData?.ok && tonCenterBalance !== undefined && tonCenterBalance !== null) {
-        const parsed = formatTonFromNano(tonCenterBalance);
-        if (parsed !== null) {
-          if (preferSingleChain) return parsed;
-          const numeric = toNumber(parsed, NaN);
-          if (!Number.isFinite(numeric)) return parsed;
-          if (!bestUnknownBalance || numeric > bestUnknownBalance.numeric) {
-            bestUnknownBalance = { parsed, numeric };
-          }
-        }
+        rememberBalance(formatTonFromNano(tonCenterBalance));
       }
     }
 
-    if (preferSingleChain && chainIndex === 0) {
-      // Explicit chain was requested; fallback chain is used only if primary failed.
-      continue;
+    return {
+      responded,
+      balance: best?.parsed ?? null,
+    };
+  };
+
+  const primary = await fetchBalanceForChain(primaryChain);
+  if (primary.balance !== null) {
+    const primaryNumeric = toNumber(primary.balance, NaN);
+    // Mobile wallets sometimes report the wrong chain; if explicit chain gives zero,
+    // probe the opposite chain and use it only when it has a positive balance.
+    if (allowFallback && Number.isFinite(primaryNumeric) && primaryNumeric <= 0) {
+      const probe = await fetchBalanceForChain(fallbackChain);
+      const probeNumeric = toNumber(probe.balance, NaN);
+      if (probe.balance !== null && Number.isFinite(probeNumeric) && probeNumeric > 0) {
+        return probe.balance;
+      }
     }
+    return primary.balance;
   }
 
-  return bestUnknownBalance?.parsed ?? null;
+  // If chain is unknown, never "mix" balances between mainnet/testnet.
+  // Use testnet only when mainnet is unreachable.
+  if (!allowFallback && primary.responded) {
+    return null;
+  }
+
+  const fallback = await fetchBalanceForChain(fallbackChain);
+  if (fallback.balance !== null) {
+    return fallback.balance;
+  }
+
+  return null;
 }
 
 function parseTokenAmount(rawValue, decimals = 9) {
@@ -3778,7 +3807,9 @@ async function fetchAccountNftItems(address, chain = "") {
     fallback = items;
   }
 
-  return hadValidResponse ? fallback : null;
+  // Fail-open for UI: if TonAPI is temporarily unavailable,
+  // keep inventory flow alive so Telegram gifts can still render.
+  return hadValidResponse ? fallback : [];
 }
 
 async function fetchCollectionMarketSnapshot(collectionAddress, ownerAddress, chain = "") {
@@ -4293,7 +4324,6 @@ async function fetchWalletMarketData(address, chain = "") {
   }
 
   const ownItems = await fetchAccountNftItems(ownerAddress, chain);
-  if (ownItems === null) return null;
   const uniqueCollections = Array.from(
     new Set(
       ownItems
