@@ -738,7 +738,8 @@ function sanitizeTranslationsAndLocales() {
 function fixMojibakeInDom(root = document) {
   if (!root?.body || typeof root.createTreeWalker !== "function") return;
 
-  const walker = root.createTreeWalker(root.body, NodeFilter.SHOW_TEXT);
+  const textFilter = typeof NodeFilter !== "undefined" ? NodeFilter.SHOW_TEXT : 4;
+  const walker = root.createTreeWalker(root.body, textFilter);
   const textNodes = [];
   while (walker.nextNode()) {
     textNodes.push(walker.currentNode);
