@@ -1,0 +1,13 @@
+{
+  "name": "upnft-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Temporary backend for UPNFT Mini App",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1"
+  }
+}

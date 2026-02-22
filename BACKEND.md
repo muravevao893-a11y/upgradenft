@@ -16,7 +16,14 @@ Minimal backend for your current Mini App frontend.
 - `POST /telegram/gifts/set`
 - `GET /health`
 
-This backend is in-memory (temporary). After container restart, sessions are reset.
+This backend now persists key state to SQLite (`/data/upnft.sqlite` in Docker):
+
+- upgrade sessions
+- request index
+- wallet cooldown/active session state
+- Telegram profile gifts (`/telegram/gifts/set`)
+
+After restart, these entities are restored automatically.
 
 `/telegram/gifts` now merges data from:
 
@@ -34,6 +41,12 @@ Backend URL:
 
 ```text
 http://localhost:8787
+```
+
+SQLite file in Docker compose setup:
+
+```text
+./backend/data/upnft.sqlite
 ```
 
 Key aggregation endpoint:
@@ -63,6 +76,7 @@ If frontend and backend are on the same host, use that public backend URL instea
 
 ## Optional env for Telegram profile gifts
 
+- `DB_PATH` - SQLite path (default `./data/upnft.sqlite`)
 - `TELEGRAM_GIFTS_PROVIDER_URL` - your API that returns `gifts`/`items`/`result` array for `user_id`
 - `TELEGRAM_GIFTS_PROVIDER_TOKEN` - optional Bearer token for that provider
 - `TONAPI_BASE` - default `https://tonapi.io/v2`

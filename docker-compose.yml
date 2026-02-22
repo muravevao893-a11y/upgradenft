@@ -9,6 +9,7 @@ services:
       - "8787:8787"
     environment:
       PORT: "8787"
+      DB_PATH: "/data/upnft.sqlite"
       CORS_ORIGIN: "*"
       SESSION_TTL_MS: "60000"
       COOLDOWN_MS: "4500"
@@ -27,3 +28,5 @@ services:
       # TELEGRAM_GIFTS_PROVIDER_TOKEN: ""
       # Optional: put JSON array here for Telegram gifts endpoint.
       # TELEGRAM_GIFTS_JSON: "[]"
+    volumes:
+      - ./backend/data:/data

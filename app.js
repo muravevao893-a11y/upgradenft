@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-77";
+﻿const APP_VERSION = "2026-02-22-80";
 
 const tabMeta = {
   tasks: {
@@ -52,7 +52,34 @@ const TONCENTER_BASE = String(window.__UPNFT_TONCENTER_BASE__ || "https://toncen
 const TONAPI_TESTNET_BASE = String(window.__UPNFT_TONAPI_TESTNET_BASE__ || "https://testnet.tonapi.io/v2").replace(/\/$/, "");
 const TONCENTER_TESTNET_BASE = String(window.__UPNFT_TONCENTER_TESTNET_BASE__ || "https://testnet.toncenter.com/api/v2").replace(/\/$/, "");
 const TELEGRAM_GIFTS_ENDPOINT = String(window.__UPNFT_GIFTS_ENDPOINT__ || "").trim();
-const UPGRADE_API_BASE = String(window.__UPNFT_UPGRADE_API_BASE__ || "").trim().replace(/\/$/, "");
+const UPGRADE_API_BASE = (() => {
+  const explicit = String(window.__UPNFT_UPGRADE_API_BASE__ || "").trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    const fromQuery = String(params.get("api") || params.get("backend") || "").trim();
+    if (fromQuery) {
+      try {
+        localStorage.setItem("upnft_api_base", fromQuery);
+      } catch {
+        // Ignore storage errors.
+      }
+      return fromQuery.replace(/\/$/, "");
+    }
+  } catch {
+    // Ignore malformed URL.
+  }
+
+  try {
+    const saved = String(localStorage.getItem("upnft_api_base") || "").trim();
+    if (saved) return saved.replace(/\/$/, "");
+  } catch {
+    // Ignore storage errors.
+  }
+
+  return "";
+})();
 const BANK_WALLET_ADDRESS = String(
   window.__UPNFT_BANK_WALLET__
   || "UQCgQQSGPlFWr5TY8UVT7XvtkVtNkRPIGUEnFOB4gRZbQEu4",
@@ -66,6 +93,10 @@ const MAX_TARGETS = 60;
 const HISTORY_LIMIT = 60;
 const RENDER_CHUNK_SIZE = 16;
 const STALE_MS = 120000;
+const NFT_CARD_SPAM_WINDOW_MS = 1000;
+const NFT_CARD_MAX_TAPS_PER_WINDOW = 14;
+const NFT_CARD_SPAM_LOCK_MS = 900;
+const NFT_CARD_PER_ITEM_COOLDOWN_MS = 180;
 const UPGRADE_COOLDOWN_MS = clamp(
   Math.floor(toNumber(window.__UPNFT_UPGRADE_COOLDOWN_MS__, 4500)),
   500,
@@ -129,7 +160,7 @@ const LOCALE_OPTIONS = [
         <rect y="10.66" width="24" height="5.34" fill="#d84444"/>
       </svg>
     `,
-    tokens: ["ru", "russian", "russia", "русский", "россия"],
+    tokens: ["ru", "russian", "russia", "СЂСѓСЃСЃРєРёР№", "СЂРѕСЃСЃРёСЏ"],
   },
   {
     code: "en",
@@ -143,7 +174,7 @@ const LOCALE_OPTIONS = [
         <path d="M12 0v16M0 8h24" stroke="#d73d3d" stroke-width="2.2"/>
       </svg>
     `,
-    tokens: ["en", "english", "england", "britain", "united kingdom", "английский"],
+    tokens: ["en", "english", "england", "britain", "united kingdom", "Р°РЅРіР»РёР№СЃРєРёР№"],
   },
   {
     code: "uk",
@@ -154,7 +185,7 @@ const LOCALE_OPTIONS = [
         <rect y="8" width="24" height="8" fill="#ffd447"/>
       </svg>
     `,
-    tokens: ["uk", "ua", "ukrainian", "ukraine", "українська", "украина"],
+    tokens: ["uk", "ua", "ukrainian", "ukraine", "СѓРєСЂР°С—РЅСЃСЊРєР°", "СѓРєСЂР°РёРЅР°"],
   },
 ];
 
@@ -163,86 +194,86 @@ const SUPPORTED_LOCALES = LOCALE_OPTIONS.map((item) => item.code);
 const TRANSLATIONS = {
   ru: {
     app_title: "UPNFT Mini App",
-    copy_done: "Скопировано",
-    copy_hint: "Нажмите, чтобы скопировать",
-    copy_username_title: "Нажми, чтобы скопировать username",
-    copy_id_title: "Нажми, чтобы скопировать ID",
-    network_idle: "Ожидание",
-    network_syncing: "Синхронизация",
-    network_ready: "Данные актуальны",
-    network_stale: "Данные устарели",
-    network_offline: "Нет сети",
-    network_error: "Ошибка сети",
-    network_restored: "Сеть восстановлена",
-    network_done: "Готово",
-    network_status: "Статус сети",
-    analytics_launches: "Запусков",
-    analytics_spins: "Круток",
-    analytics_conversion: "Конверсия",
-    onboarding_start_title: "Старт",
-    onboarding_start_note: "Подключи TON Wallet, чтобы загрузить NFT и рыночные цели.",
-    onboarding_wallet_title: "Кошелек подключен",
-    onboarding_wallet_note: "NFT пока не найдены. Проверь кошелек и обнови загрузку.",
-    onboarding_prices_title: "Нужны рыночные цены",
-    onboarding_prices_note: "NFT есть, но для них пока нет TON-оценки. Попробуй обновить позже.",
-    onboarding_targets_title: "Нет рыночных целей",
-    onboarding_targets_note: "Для выбранных коллекций не найдено доступных целей на рынке.",
-    onboarding_connect: "Подключить",
-    onboarding_refresh: "Обновить NFT",
-    fair_label: "Честный рандом",
-    fair_copy: "Копировать",
-    chance_probability: "Вероятность",
-    note_select_nft: "Выбери NFT",
-    note_secure_backend_required: "Апгрейд временно недоступен: не подключен защищенный сервер.",
-    note_secure_wallet_required: "Подключи кошелек для защищенного апгрейда.",
+    copy_done: "РЎРєРѕРїРёСЂРѕРІР°РЅРѕ",
+    copy_hint: "РќР°Р¶РјРёС‚Рµ, С‡С‚РѕР±С‹ СЃРєРѕРїРёСЂРѕРІР°С‚СЊ",
+    copy_username_title: "РќР°Р¶РјРё, С‡С‚РѕР±С‹ СЃРєРѕРїРёСЂРѕРІР°С‚СЊ username",
+    copy_id_title: "РќР°Р¶РјРё, С‡С‚РѕР±С‹ СЃРєРѕРїРёСЂРѕРІР°С‚СЊ ID",
+    network_idle: "РћР¶РёРґР°РЅРёРµ",
+    network_syncing: "РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ",
+    network_ready: "Р”Р°РЅРЅС‹Рµ Р°РєС‚СѓР°Р»СЊРЅС‹",
+    network_stale: "Р”Р°РЅРЅС‹Рµ СѓСЃС‚Р°СЂРµР»Рё",
+    network_offline: "РќРµС‚ СЃРµС‚Рё",
+    network_error: "РћС€РёР±РєР° СЃРµС‚Рё",
+    network_restored: "РЎРµС‚СЊ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅР°",
+    network_done: "Р“РѕС‚РѕРІРѕ",
+    network_status: "РЎС‚Р°С‚СѓСЃ СЃРµС‚Рё",
+    analytics_launches: "Р—Р°РїСѓСЃРєРѕРІ",
+    analytics_spins: "РљСЂСѓС‚РѕРє",
+    analytics_conversion: "РљРѕРЅРІРµСЂСЃРёСЏ",
+    onboarding_start_title: "РЎС‚Р°СЂС‚",
+    onboarding_start_note: "РџРѕРґРєР»СЋС‡Рё TON Wallet, С‡С‚РѕР±С‹ Р·Р°РіСЂСѓР·РёС‚СЊ NFT Рё СЂС‹РЅРѕС‡РЅС‹Рµ С†РµР»Рё.",
+    onboarding_wallet_title: "РљРѕС€РµР»РµРє РїРѕРґРєР»СЋС‡РµРЅ",
+    onboarding_wallet_note: "NFT РїРѕРєР° РЅРµ РЅР°Р№РґРµРЅС‹. РџСЂРѕРІРµСЂСЊ РєРѕС€РµР»РµРє Рё РѕР±РЅРѕРІРё Р·Р°РіСЂСѓР·РєСѓ.",
+    onboarding_prices_title: "РќСѓР¶РЅС‹ СЂС‹РЅРѕС‡РЅС‹Рµ С†РµРЅС‹",
+    onboarding_prices_note: "NFT РµСЃС‚СЊ, РЅРѕ РґР»СЏ РЅРёС… РїРѕРєР° РЅРµС‚ TON-РѕС†РµРЅРєРё. РџРѕРїСЂРѕР±СѓР№ РѕР±РЅРѕРІРёС‚СЊ РїРѕР·Р¶Рµ.",
+    onboarding_targets_title: "РќРµС‚ СЂС‹РЅРѕС‡РЅС‹С… С†РµР»РµР№",
+    onboarding_targets_note: "Р”Р»СЏ РІС‹Р±СЂР°РЅРЅС‹С… РєРѕР»Р»РµРєС†РёР№ РЅРµ РЅР°Р№РґРµРЅРѕ РґРѕСЃС‚СѓРїРЅС‹С… С†РµР»РµР№ РЅР° СЂС‹РЅРєРµ.",
+    onboarding_connect: "РџРѕРґРєР»СЋС‡РёС‚СЊ",
+    onboarding_refresh: "РћР±РЅРѕРІРёС‚СЊ NFT",
+    fair_label: "Р§РµСЃС‚РЅС‹Р№ СЂР°РЅРґРѕРј",
+    fair_copy: "РљРѕРїРёСЂРѕРІР°С‚СЊ",
+    chance_probability: "Р’РµСЂРѕСЏС‚РЅРѕСЃС‚СЊ",
+    note_select_nft: "Р’С‹Р±РµСЂРё NFT",
+    note_secure_backend_required: "РђРїРіСЂРµР№Рґ РІСЂРµРјРµРЅРЅРѕ РЅРµРґРѕСЃС‚СѓРїРµРЅ: РЅРµ РїРѕРґРєР»СЋС‡РµРЅ Р·Р°С‰РёС‰РµРЅРЅС‹Р№ СЃРµСЂРІРµСЂ.",
+    note_secure_wallet_required: "РџРѕРґРєР»СЋС‡Рё РєРѕС€РµР»РµРє РґР»СЏ Р·Р°С‰РёС‰РµРЅРЅРѕРіРѕ Р°РїРіСЂРµР№РґР°.",
 
     note_upgrade_cooldown: "Cooldown: {seconds}s",
     note_upgrade_penalty: "Offer lock: {seconds}s",
-    button_upgrade_start: "Запустить апгрейд",
-    button_upgrade_spin: "Крутим...",
-    button_continue: "Продолжить",
-    button_back: "Назад",
-    title_pick_target: "Выбор NFT",
-    note_pick_target: "Выбери цель апгрейда",
-    note_pick_source: "Выбери до {count} NFT",
+    button_upgrade_start: "Р—Р°РїСѓСЃС‚РёС‚СЊ Р°РїРіСЂРµР№Рґ",
+    button_upgrade_spin: "РљСЂСѓС‚РёРј...",
+    button_continue: "РџСЂРѕРґРѕР»Р¶РёС‚СЊ",
+    button_back: "РќР°Р·Р°Рґ",
+    title_pick_target: "Р’С‹Р±РѕСЂ NFT",
+    note_pick_target: "Р’С‹Р±РµСЂРё С†РµР»СЊ Р°РїРіСЂРµР№РґР°",
+    note_pick_source: "Р’С‹Р±РµСЂРё РґРѕ {count} NFT",
 
     button_upgrade_queue: "Queue...",
     button_upgrade_cooldown: "Cooldown {seconds}s",
     button_upgrade_penalty: "Blocked {seconds}s",
-    my_nft_title: "Мои NFT",
-    history_title: "История апгрейдов",
-    history_clear: "Очистить",
-    history_empty: "Пока нет круток.",
+    my_nft_title: "РњРѕРё NFT",
+    history_title: "РСЃС‚РѕСЂРёСЏ Р°РїРіСЂРµР№РґРѕРІ",
+    history_clear: "РћС‡РёСЃС‚РёС‚СЊ",
+    history_empty: "РџРѕРєР° РЅРµС‚ РєСЂСѓС‚РѕРє.",
     history_win: "WIN",
     history_loss: "LOSE",
-    history_meta: "{time} • {chance}% • n{nonce}",
-    history_fair: "hash {hash} • seed {seed}",
-    tasks_empty: "Нет активных заданий.",
-    cases_empty: "Нет кейсов для текущего уровня.",
-    bonuses_empty: "Нет активных бонусов.",
-    search_target_placeholder: "Поиск цели",
-    search_own_placeholder: "Поиск NFT",
-    sort_price_low: "Цена: дешевые",
-    sort_price_high: "Цена: дорогие",
-    sort_name_asc: "Имя: A-Z",
-    sort_name_desc: "Имя: Z-A",
-    target_empty_unavailable: "Рыночные цели не найдены.",
-    target_empty_filter: "Нет результатов по фильтру.",
-    own_empty_no_price: "Нет NFT с рыночной TON-ценой.",
-    own_empty_filter: "Нет результатов по фильтру.",
-    own_empty_not_loaded: "NFT не загружены.",
-    nft_card_auction_soon: "Аукцион скоро завершится",
-    nft_card_owned: "В инвентаре",
+    history_meta: "{time} вЂў {chance}% вЂў n{nonce}",
+    history_fair: "hash {hash} вЂў seed {seed}",
+    tasks_empty: "РќРµС‚ Р°РєС‚РёРІРЅС‹С… Р·Р°РґР°РЅРёР№.",
+    cases_empty: "РќРµС‚ РєРµР№СЃРѕРІ РґР»СЏ С‚РµРєСѓС‰РµРіРѕ СѓСЂРѕРІРЅСЏ.",
+    bonuses_empty: "РќРµС‚ Р°РєС‚РёРІРЅС‹С… Р±РѕРЅСѓСЃРѕРІ.",
+    search_target_placeholder: "РџРѕРёСЃРє С†РµР»Рё",
+    search_own_placeholder: "РџРѕРёСЃРє NFT",
+    sort_price_low: "Р¦РµРЅР°: РґРµС€РµРІС‹Рµ",
+    sort_price_high: "Р¦РµРЅР°: РґРѕСЂРѕРіРёРµ",
+    sort_name_asc: "РРјСЏ: A-Z",
+    sort_name_desc: "РРјСЏ: Z-A",
+    target_empty_unavailable: "Р С‹РЅРѕС‡РЅС‹Рµ С†РµР»Рё РЅРµ РЅР°Р№РґРµРЅС‹.",
+    target_empty_filter: "РќРµС‚ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РїРѕ С„РёР»СЊС‚СЂСѓ.",
+    own_empty_no_price: "РќРµС‚ NFT СЃ СЂС‹РЅРѕС‡РЅРѕР№ TON-С†РµРЅРѕР№.",
+    own_empty_filter: "РќРµС‚ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РїРѕ С„РёР»СЊС‚СЂСѓ.",
+    own_empty_not_loaded: "Нет NFT.",
+    nft_card_auction_soon: "РђСѓРєС†РёРѕРЅ СЃРєРѕСЂРѕ Р·Р°РІРµСЂС€РёС‚СЃСЏ",
+    nft_card_owned: "Р’ РёРЅРІРµРЅС‚Р°СЂРµ",
     nft_status_for_sale: "For sale",
-    nft_status_market: "Маркет",
-    nft_status_wallet: "Кошелек",
+    nft_status_market: "РњР°СЂРєРµС‚",
+    nft_status_wallet: "РљРѕС€РµР»РµРє",
     nft_status_telegram: "Telegram",
-    nft_status_bank: "Банк",
-    task_status_active: "Активно",
-    result_win: "Выигрыш",
-    result_loss: "Проигрыш",
-    result_error: "Ошибка апгрейда",
-    result_security_reject: "Операция отклонена защитой",
+    nft_status_bank: "Р‘Р°РЅРє",
+    task_status_active: "РђРєС‚РёРІРЅРѕ",
+    result_win: "Р’С‹РёРіСЂС‹С€",
+    result_loss: "РџСЂРѕРёРіСЂС‹С€",
+    result_error: "РћС€РёР±РєР° Р°РїРіСЂРµР№РґР°",
+    result_security_reject: "РћРїРµСЂР°С†РёСЏ РѕС‚РєР»РѕРЅРµРЅР° Р·Р°С‰РёС‚РѕР№",
 
     result_cooldown: "Cooldown active: {seconds}s",
     result_penalty: "Offer lock: {seconds}s",
@@ -251,54 +282,54 @@ const TRANSLATIONS = {
     result_queue_timeout: "Queue wait timeout. Try again.",
     result_offer_timeout: "Offer expired. Try again later.",
     result_offer_rejected: "Offer was not accepted.",
-    payout_ton_label: "TON выплата",
-    guest_name: "Гость",
-    avatar_alt: "Аватар пользователя",
+    payout_ton_label: "TON РІС‹РїР»Р°С‚Р°",
+    guest_name: "Р“РѕСЃС‚СЊ",
+    avatar_alt: "РђРІР°С‚Р°СЂ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ",
     profile_stat_nft: "NFT",
-    profile_stat_upgrades: "Апгрейдов",
+    profile_stat_upgrades: "РђРїРіСЂРµР№РґРѕРІ",
     profile_stat_winrate: "Winrate",
-    profile_tab_my: "Мои NFT",
-    profile_tab_dropped: "Выбитые NFT",
-    profile_my_empty: "NFT пока нет.",
-    profile_dropped_empty: "Выбитых NFT пока нет.",
-    wallet_connect: "Подключить кошелек",
-    wallet_not_connected: "Кошелек не подключен",
-    wallet_balance_loading: "Загрузка...",
-    wallet_syncing_nft: "Синхронизация NFT...",
-    wallet_nft_load_error: "Ошибка загрузки NFT",
-    wallet_no_nft: "NFT не найдены ни в кошельке, ни в Telegram-профиле.",
-    wallet_no_prices: "NFT загружены, цены TON не найдены",
+    profile_tab_my: "РњРѕРё NFT",
+    profile_tab_dropped: "Р’С‹Р±РёС‚С‹Рµ NFT",
+    profile_my_empty: "Нет NFT.",
+    profile_dropped_empty: "Нет выбитых NFT.",
+    wallet_connect: "РџРѕРґРєР»СЋС‡РёС‚СЊ РєРѕС€РµР»РµРє",
+    wallet_not_connected: "РљРѕС€РµР»РµРє РЅРµ РїРѕРґРєР»СЋС‡РµРЅ",
+    wallet_balance_loading: "Р—Р°РіСЂСѓР·РєР°...",
+    wallet_syncing_nft: "РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ NFT...",
+    wallet_nft_load_error: "РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё NFT",
+    wallet_no_nft: "NFT РЅРµ РЅР°Р№РґРµРЅС‹ РЅРё РІ РєРѕС€РµР»СЊРєРµ, РЅРё РІ Telegram-РїСЂРѕС„РёР»Рµ.",
+    wallet_no_prices: "NFT Р·Р°РіСЂСѓР¶РµРЅС‹, С†РµРЅС‹ TON РЅРµ РЅР°Р№РґРµРЅС‹",
     wallet_nft_count: "NFT: {count}",
-    wallet_tonconnect_missing: "TonConnect недоступен",
-    wallet_tonconnect_init_error: "Ошибка инициализации TON Connect",
-    wallet_connect_failed: "Не удалось подключить кошелек",
-    wallet_disconnect: "Отвязать кошелек",
-    wallet_actions_aria: "Действия кошелька",
-    nav_label: "Навигация",
-    nav_tasks: "Задания",
-    nav_upgrades: "Апгрейды",
-    nav_cases: "Кейсы",
-    nav_bonuses: "Бонусы",
-    nav_profile: "Вы",
-    locale_title: "Язык",
-    locale_search_placeholder: "Поиск языка или страны",
-    locale_select_aria: "Выбрать язык",
-    locale_empty: "Ничего не найдено",
-    locale_open_aria: "Открыть страницу языка ({language})",
-    language_page_title: "Язык",
-    language_page_back_aria: "Назад в профиль",
-    settings_open_aria: "Открыть настройки",
-    settings_page_title: "Настройки",
-    settings_back_aria: "Назад в профиль",
-    settings_language_title: "Язык",
-    settings_language_value: "Выбрать язык интерфейса",
-    settings_language_aria: "Открыть языковые настройки",
-    lang_ru_name: "Русский",
-    lang_ru_country: "Россия",
+    wallet_tonconnect_missing: "TonConnect РЅРµРґРѕСЃС‚СѓРїРµРЅ",
+    wallet_tonconnect_init_error: "РћС€РёР±РєР° РёРЅРёС†РёР°Р»РёР·Р°С†РёРё TON Connect",
+    wallet_connect_failed: "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґРєР»СЋС‡РёС‚СЊ РєРѕС€РµР»РµРє",
+    wallet_disconnect: "РћС‚РІСЏР·Р°С‚СЊ РєРѕС€РµР»РµРє",
+    wallet_actions_aria: "Р”РµР№СЃС‚РІРёСЏ РєРѕС€РµР»СЊРєР°",
+    nav_label: "РќР°РІРёРіР°С†РёСЏ",
+    nav_tasks: "Р—Р°РґР°РЅРёСЏ",
+    nav_upgrades: "РђРїРіСЂРµР№РґС‹",
+    nav_cases: "РљРµР№СЃС‹",
+    nav_bonuses: "Р‘РѕРЅСѓСЃС‹",
+    nav_profile: "Р’С‹",
+    locale_title: "РЇР·С‹Рє",
+    locale_search_placeholder: "РџРѕРёСЃРє СЏР·С‹РєР° РёР»Рё СЃС‚СЂР°РЅС‹",
+    locale_select_aria: "Р’С‹Р±СЂР°С‚СЊ СЏР·С‹Рє",
+    locale_empty: "РќРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅРѕ",
+    locale_open_aria: "РћС‚РєСЂС‹С‚СЊ СЃС‚СЂР°РЅРёС†Сѓ СЏР·С‹РєР° ({language})",
+    language_page_title: "РЇР·С‹Рє",
+    language_page_back_aria: "РќР°Р·Р°Рґ РІ РїСЂРѕС„РёР»СЊ",
+    settings_open_aria: "РћС‚РєСЂС‹С‚СЊ РЅР°СЃС‚СЂРѕР№РєРё",
+    settings_page_title: "РќР°СЃС‚СЂРѕР№РєРё",
+    settings_back_aria: "РќР°Р·Р°Рґ РІ РїСЂРѕС„РёР»СЊ",
+    settings_language_title: "РЇР·С‹Рє",
+    settings_language_value: "Р’С‹Р±СЂР°С‚СЊ СЏР·С‹Рє РёРЅС‚РµСЂС„РµР№СЃР°",
+    settings_language_aria: "РћС‚РєСЂС‹С‚СЊ СЏР·С‹РєРѕРІС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё",
+    lang_ru_name: "Р СѓСЃСЃРєРёР№",
+    lang_ru_country: "Р РѕСЃСЃРёСЏ",
     lang_en_name: "English",
     lang_en_country: "United Kingdom",
-    lang_uk_name: "Українська",
-    lang_uk_country: "Україна",
+    lang_uk_name: "РЈРєСЂР°С—РЅСЃСЊРєР°",
+    lang_uk_country: "РЈРєСЂР°С—РЅР°",
   },
   en: {
     app_title: "UPNFT Mini App",
@@ -354,8 +385,8 @@ const TRANSLATIONS = {
     history_empty: "No spins yet.",
     history_win: "WIN",
     history_loss: "LOSE",
-    history_meta: "{time} • {chance}% • n{nonce}",
-    history_fair: "hash {hash} • seed {seed}",
+    history_meta: "{time} вЂў {chance}% вЂў n{nonce}",
+    history_fair: "hash {hash} вЂў seed {seed}",
     tasks_empty: "No active tasks.",
     cases_empty: "No cases available for your current level.",
     bonuses_empty: "No active bonuses.",
@@ -369,7 +400,7 @@ const TRANSLATIONS = {
     target_empty_filter: "No results for current filter.",
     own_empty_no_price: "No NFT with TON market price.",
     own_empty_filter: "No results for current filter.",
-    own_empty_not_loaded: "NFT not loaded.",
+    own_empty_not_loaded: "No NFT.",
     nft_card_auction_soon: "Auction will close soon",
     nft_card_owned: "In inventory",
     nft_status_for_sale: "For sale",
@@ -398,8 +429,8 @@ const TRANSLATIONS = {
     profile_stat_winrate: "Winrate",
     profile_tab_my: "My NFT",
     profile_tab_dropped: "Dropped NFT",
-    profile_my_empty: "No NFT yet.",
-    profile_dropped_empty: "No dropped NFT yet.",
+    profile_my_empty: "No NFT.",
+    profile_dropped_empty: "No dropped NFT.",
     wallet_connect: "Connect wallet",
     wallet_not_connected: "Wallet not connected",
     wallet_balance_loading: "Loading...",
@@ -441,86 +472,86 @@ const TRANSLATIONS = {
   },
   uk: {
     app_title: "UPNFT Mini App",
-    copy_done: "Скопійовано",
-    copy_hint: "Натисни, щоб скопіювати",
-    copy_username_title: "Натисни, щоб скопіювати username",
-    copy_id_title: "Натисни, щоб скопіювати ID",
-    network_idle: "Очікування",
-    network_syncing: "Синхронізація",
-    network_ready: "Дані актуальні",
-    network_stale: "Дані застаріли",
-    network_offline: "Немає мережі",
-    network_error: "Помилка мережі",
-    network_restored: "Мережу відновлено",
-    network_done: "Готово",
-    network_status: "Статус мережі",
-    analytics_launches: "Запусків",
-    analytics_spins: "Прокруток",
-    analytics_conversion: "Конверсія",
-    onboarding_start_title: "Старт",
-    onboarding_start_note: "Підключи TON Wallet, щоб завантажити NFT і ринкові цілі.",
-    onboarding_wallet_title: "Гаманець підключено",
-    onboarding_wallet_note: "NFT поки не знайдено. Перевір гаманець і онови.",
-    onboarding_prices_title: "Потрібні ринкові ціни",
-    onboarding_prices_note: "NFT є, але для них поки немає TON-оцінки. Спробуй пізніше.",
-    onboarding_targets_title: "Немає ринкових цілей",
-    onboarding_targets_note: "Для вибраних колекцій не знайдено доступних цілей.",
-    onboarding_connect: "Підключити",
-    onboarding_refresh: "Оновити NFT",
-    fair_label: "Чесний рандом",
-    fair_copy: "Копіювати",
-    chance_probability: "Ймовірність",
-    note_select_nft: "Обери NFT",
-    note_secure_backend_required: "Апгрейд тимчасово недоступний: не підключено захищений сервер.",
-    note_secure_wallet_required: "Підключи гаманець для захищеного апгрейда.",
+    copy_done: "РЎРєРѕРїС–Р№РѕРІР°РЅРѕ",
+    copy_hint: "РќР°С‚РёСЃРЅРё, С‰РѕР± СЃРєРѕРїС–СЋРІР°С‚Рё",
+    copy_username_title: "РќР°С‚РёСЃРЅРё, С‰РѕР± СЃРєРѕРїС–СЋРІР°С‚Рё username",
+    copy_id_title: "РќР°С‚РёСЃРЅРё, С‰РѕР± СЃРєРѕРїС–СЋРІР°С‚Рё ID",
+    network_idle: "РћС‡С–РєСѓРІР°РЅРЅСЏ",
+    network_syncing: "РЎРёРЅС…СЂРѕРЅС–Р·Р°С†С–СЏ",
+    network_ready: "Р”Р°РЅС– Р°РєС‚СѓР°Р»СЊРЅС–",
+    network_stale: "Р”Р°РЅС– Р·Р°СЃС‚Р°СЂС–Р»Рё",
+    network_offline: "РќРµРјР°С” РјРµСЂРµР¶С–",
+    network_error: "РџРѕРјРёР»РєР° РјРµСЂРµР¶С–",
+    network_restored: "РњРµСЂРµР¶Сѓ РІС–РґРЅРѕРІР»РµРЅРѕ",
+    network_done: "Р“РѕС‚РѕРІРѕ",
+    network_status: "РЎС‚Р°С‚СѓСЃ РјРµСЂРµР¶С–",
+    analytics_launches: "Р—Р°РїСѓСЃРєС–РІ",
+    analytics_spins: "РџСЂРѕРєСЂСѓС‚РѕРє",
+    analytics_conversion: "РљРѕРЅРІРµСЂСЃС–СЏ",
+    onboarding_start_title: "РЎС‚Р°СЂС‚",
+    onboarding_start_note: "РџС–РґРєР»СЋС‡Рё TON Wallet, С‰РѕР± Р·Р°РІР°РЅС‚Р°Р¶РёС‚Рё NFT С– СЂРёРЅРєРѕРІС– С†С–Р»С–.",
+    onboarding_wallet_title: "Р“Р°РјР°РЅРµС†СЊ РїС–РґРєР»СЋС‡РµРЅРѕ",
+    onboarding_wallet_note: "NFT РїРѕРєРё РЅРµ Р·РЅР°Р№РґРµРЅРѕ. РџРµСЂРµРІС–СЂ РіР°РјР°РЅРµС†СЊ С– РѕРЅРѕРІРё.",
+    onboarding_prices_title: "РџРѕС‚СЂС–Р±РЅС– СЂРёРЅРєРѕРІС– С†С–РЅРё",
+    onboarding_prices_note: "NFT С”, Р°Р»Рµ РґР»СЏ РЅРёС… РїРѕРєРё РЅРµРјР°С” TON-РѕС†С–РЅРєРё. РЎРїСЂРѕР±СѓР№ РїС–Р·РЅС–С€Рµ.",
+    onboarding_targets_title: "РќРµРјР°С” СЂРёРЅРєРѕРІРёС… С†С–Р»РµР№",
+    onboarding_targets_note: "Р”Р»СЏ РІРёР±СЂР°РЅРёС… РєРѕР»РµРєС†С–Р№ РЅРµ Р·РЅР°Р№РґРµРЅРѕ РґРѕСЃС‚СѓРїРЅРёС… С†С–Р»РµР№.",
+    onboarding_connect: "РџС–РґРєР»СЋС‡РёС‚Рё",
+    onboarding_refresh: "РћРЅРѕРІРёС‚Рё NFT",
+    fair_label: "Р§РµСЃРЅРёР№ СЂР°РЅРґРѕРј",
+    fair_copy: "РљРѕРїС–СЋРІР°С‚Рё",
+    chance_probability: "Р™РјРѕРІС–СЂРЅС–СЃС‚СЊ",
+    note_select_nft: "РћР±РµСЂРё NFT",
+    note_secure_backend_required: "РђРїРіСЂРµР№Рґ С‚РёРјС‡Р°СЃРѕРІРѕ РЅРµРґРѕСЃС‚СѓРїРЅРёР№: РЅРµ РїС–РґРєР»СЋС‡РµРЅРѕ Р·Р°С…РёС‰РµРЅРёР№ СЃРµСЂРІРµСЂ.",
+    note_secure_wallet_required: "РџС–РґРєР»СЋС‡Рё РіР°РјР°РЅРµС†СЊ РґР»СЏ Р·Р°С…РёС‰РµРЅРѕРіРѕ Р°РїРіСЂРµР№РґР°.",
 
     note_upgrade_cooldown: "Cooldown: {seconds}s",
     note_upgrade_penalty: "Offer lock: {seconds}s",
-    button_upgrade_start: "Запустити апгрейд",
-    button_upgrade_spin: "Крутимо...",
-    button_continue: "Продовжити",
-    button_back: "Назад",
-    title_pick_target: "Вибір NFT",
-    note_pick_target: "Обери ціль апгрейду",
-    note_pick_source: "Обери до {count} NFT",
+    button_upgrade_start: "Р—Р°РїСѓСЃС‚РёС‚Рё Р°РїРіСЂРµР№Рґ",
+    button_upgrade_spin: "РљСЂСѓС‚РёРјРѕ...",
+    button_continue: "РџСЂРѕРґРѕРІР¶РёС‚Рё",
+    button_back: "РќР°Р·Р°Рґ",
+    title_pick_target: "Р’РёР±С–СЂ NFT",
+    note_pick_target: "РћР±РµСЂРё С†С–Р»СЊ Р°РїРіСЂРµР№РґСѓ",
+    note_pick_source: "РћР±РµСЂРё РґРѕ {count} NFT",
 
     button_upgrade_queue: "Queue...",
     button_upgrade_cooldown: "Cooldown {seconds}s",
     button_upgrade_penalty: "Blocked {seconds}s",
-    my_nft_title: "Мої NFT",
-    history_title: "Історія апгрейдів",
-    history_clear: "Очистити",
-    history_empty: "Поки немає прокруток.",
+    my_nft_title: "РњРѕС— NFT",
+    history_title: "Р†СЃС‚РѕСЂС–СЏ Р°РїРіСЂРµР№РґС–РІ",
+    history_clear: "РћС‡РёСЃС‚РёС‚Рё",
+    history_empty: "РџРѕРєРё РЅРµРјР°С” РїСЂРѕРєСЂСѓС‚РѕРє.",
     history_win: "WIN",
     history_loss: "LOSE",
-    history_meta: "{time} • {chance}% • n{nonce}",
-    history_fair: "hash {hash} • seed {seed}",
-    tasks_empty: "Немає активних завдань.",
-    cases_empty: "Немає кейсів для поточного рівня.",
-    bonuses_empty: "Немає активних бонусів.",
-    search_target_placeholder: "Пошук цілі",
-    search_own_placeholder: "Пошук NFT",
-    sort_price_low: "Ціна: дешевші",
-    sort_price_high: "Ціна: дорожчі",
-    sort_name_asc: "Ім'я: A-Z",
-    sort_name_desc: "Ім'я: Z-A",
-    target_empty_unavailable: "Ринкові цілі не знайдено.",
-    target_empty_filter: "Немає результатів за фільтром.",
-    own_empty_no_price: "Немає NFT з ринковою TON-ціною.",
-    own_empty_filter: "Немає результатів за фільтром.",
-    own_empty_not_loaded: "NFT не завантажені.",
-    nft_card_auction_soon: "Аукціон скоро завершиться",
-    nft_card_owned: "В інвентарі",
+    history_meta: "{time} вЂў {chance}% вЂў n{nonce}",
+    history_fair: "hash {hash} вЂў seed {seed}",
+    tasks_empty: "РќРµРјР°С” Р°РєС‚РёРІРЅРёС… Р·Р°РІРґР°РЅСЊ.",
+    cases_empty: "РќРµРјР°С” РєРµР№СЃС–РІ РґР»СЏ РїРѕС‚РѕС‡РЅРѕРіРѕ СЂС–РІРЅСЏ.",
+    bonuses_empty: "РќРµРјР°С” Р°РєС‚РёРІРЅРёС… Р±РѕРЅСѓСЃС–РІ.",
+    search_target_placeholder: "РџРѕС€СѓРє С†С–Р»С–",
+    search_own_placeholder: "РџРѕС€СѓРє NFT",
+    sort_price_low: "Р¦С–РЅР°: РґРµС€РµРІС€С–",
+    sort_price_high: "Р¦С–РЅР°: РґРѕСЂРѕР¶С‡С–",
+    sort_name_asc: "Р†Рј'СЏ: A-Z",
+    sort_name_desc: "Р†Рј'СЏ: Z-A",
+    target_empty_unavailable: "Р РёРЅРєРѕРІС– С†С–Р»С– РЅРµ Р·РЅР°Р№РґРµРЅРѕ.",
+    target_empty_filter: "РќРµРјР°С” СЂРµР·СѓР»СЊС‚Р°С‚С–РІ Р·Р° С„С–Р»СЊС‚СЂРѕРј.",
+    own_empty_no_price: "РќРµРјР°С” NFT Р· СЂРёРЅРєРѕРІРѕСЋ TON-С†С–РЅРѕСЋ.",
+    own_empty_filter: "РќРµРјР°С” СЂРµР·СѓР»СЊС‚Р°С‚С–РІ Р·Р° С„С–Р»СЊС‚СЂРѕРј.",
+    own_empty_not_loaded: "Немає NFT.",
+    nft_card_auction_soon: "РђСѓРєС†С–РѕРЅ СЃРєРѕСЂРѕ Р·Р°РІРµСЂС€РёС‚СЊСЃСЏ",
+    nft_card_owned: "Р’ С–РЅРІРµРЅС‚Р°СЂС–",
     nft_status_for_sale: "For sale",
-    nft_status_market: "Маркет",
-    nft_status_wallet: "Гаманець",
+    nft_status_market: "РњР°СЂРєРµС‚",
+    nft_status_wallet: "Р“Р°РјР°РЅРµС†СЊ",
     nft_status_telegram: "Telegram",
-    nft_status_bank: "Банк",
-    task_status_active: "Активно",
-    result_win: "Виграш",
-    result_loss: "Програш",
-    result_error: "Помилка апгрейда",
-    result_security_reject: "Операцію відхилено захистом",
+    nft_status_bank: "Р‘Р°РЅРє",
+    task_status_active: "РђРєС‚РёРІРЅРѕ",
+    result_win: "Р’РёРіСЂР°С€",
+    result_loss: "РџСЂРѕРіСЂР°С€",
+    result_error: "РџРѕРјРёР»РєР° Р°РїРіСЂРµР№РґР°",
+    result_security_reject: "РћРїРµСЂР°С†С–СЋ РІС–РґС…РёР»РµРЅРѕ Р·Р°С…РёСЃС‚РѕРј",
 
     result_cooldown: "Cooldown active: {seconds}s",
     result_penalty: "Offer lock: {seconds}s",
@@ -529,54 +560,54 @@ const TRANSLATIONS = {
     result_queue_timeout: "Queue wait timeout. Try again.",
     result_offer_timeout: "Offer expired. Try again later.",
     result_offer_rejected: "Offer was not accepted.",
-    payout_ton_label: "TON виплата",
-    guest_name: "Гість",
-    avatar_alt: "Аватар користувача",
+    payout_ton_label: "TON РІРёРїР»Р°С‚Р°",
+    guest_name: "Р“С–СЃС‚СЊ",
+    avatar_alt: "РђРІР°С‚Р°СЂ РєРѕСЂРёСЃС‚СѓРІР°С‡Р°",
     profile_stat_nft: "NFT",
-    profile_stat_upgrades: "Апгрейдів",
+    profile_stat_upgrades: "РђРїРіСЂРµР№РґС–РІ",
     profile_stat_winrate: "Winrate",
-    profile_tab_my: "Мої NFT",
-    profile_tab_dropped: "Вибиті NFT",
-    profile_my_empty: "NFT поки немає.",
-    profile_dropped_empty: "Вибитих NFT поки немає.",
-    wallet_connect: "Підключити гаманець",
-    wallet_not_connected: "Гаманець не підключено",
-    wallet_balance_loading: "Завантаження...",
-    wallet_syncing_nft: "Синхронізація NFT...",
-    wallet_nft_load_error: "Помилка завантаження NFT",
-    wallet_no_nft: "NFT не знайдено ні в гаманці, ні в Telegram-профілі.",
-    wallet_no_prices: "NFT завантажені, ціни TON не знайдено",
+    profile_tab_my: "РњРѕС— NFT",
+    profile_tab_dropped: "Р’РёР±РёС‚С– NFT",
+    profile_my_empty: "Немає NFT.",
+    profile_dropped_empty: "Немає вибитих NFT.",
+    wallet_connect: "РџС–РґРєР»СЋС‡РёС‚Рё РіР°РјР°РЅРµС†СЊ",
+    wallet_not_connected: "Р“Р°РјР°РЅРµС†СЊ РЅРµ РїС–РґРєР»СЋС‡РµРЅРѕ",
+    wallet_balance_loading: "Р—Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ...",
+    wallet_syncing_nft: "РЎРёРЅС…СЂРѕРЅС–Р·Р°С†С–СЏ NFT...",
+    wallet_nft_load_error: "РџРѕРјРёР»РєР° Р·Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ NFT",
+    wallet_no_nft: "NFT РЅРµ Р·РЅР°Р№РґРµРЅРѕ РЅС– РІ РіР°РјР°РЅС†С–, РЅС– РІ Telegram-РїСЂРѕС„С–Р»С–.",
+    wallet_no_prices: "NFT Р·Р°РІР°РЅС‚Р°Р¶РµРЅС–, С†С–РЅРё TON РЅРµ Р·РЅР°Р№РґРµРЅРѕ",
     wallet_nft_count: "NFT: {count}",
-    wallet_tonconnect_missing: "TonConnect недоступний",
-    wallet_tonconnect_init_error: "Помилка ініціалізації TON Connect",
-    wallet_connect_failed: "Не вдалося підключити гаманець",
-    wallet_disconnect: "Відвʼязати гаманець",
-    wallet_actions_aria: "Дії гаманця",
-    nav_label: "Навігація",
-    nav_tasks: "Завдання",
-    nav_upgrades: "Апгрейди",
-    nav_cases: "Кейси",
-    nav_bonuses: "Бонуси",
-    nav_profile: "Ви",
-    locale_title: "Мова",
-    locale_search_placeholder: "Пошук мови або країни",
-    locale_select_aria: "Обрати мову",
-    locale_empty: "Нічого не знайдено",
-    locale_open_aria: "Відкрити сторінку мови ({language})",
-    language_page_title: "Мова",
-    language_page_back_aria: "Назад у профіль",
-    settings_open_aria: "Відкрити налаштування",
-    settings_page_title: "Налаштування",
-    settings_back_aria: "Назад у профіль",
-    settings_language_title: "Мова",
-    settings_language_value: "Обрати мову інтерфейсу",
-    settings_language_aria: "Відкрити мовні налаштування",
-    lang_ru_name: "Російська",
-    lang_ru_country: "Росія",
-    lang_en_name: "Англійська",
+    wallet_tonconnect_missing: "TonConnect РЅРµРґРѕСЃС‚СѓРїРЅРёР№",
+    wallet_tonconnect_init_error: "РџРѕРјРёР»РєР° С–РЅС–С†С–Р°Р»С–Р·Р°С†С–С— TON Connect",
+    wallet_connect_failed: "РќРµ РІРґР°Р»РѕСЃСЏ РїС–РґРєР»СЋС‡РёС‚Рё РіР°РјР°РЅРµС†СЊ",
+    wallet_disconnect: "Р’С–РґРІКјСЏР·Р°С‚Рё РіР°РјР°РЅРµС†СЊ",
+    wallet_actions_aria: "Р”С–С— РіР°РјР°РЅС†СЏ",
+    nav_label: "РќР°РІС–РіР°С†С–СЏ",
+    nav_tasks: "Р—Р°РІРґР°РЅРЅСЏ",
+    nav_upgrades: "РђРїРіСЂРµР№РґРё",
+    nav_cases: "РљРµР№СЃРё",
+    nav_bonuses: "Р‘РѕРЅСѓСЃРё",
+    nav_profile: "Р’Рё",
+    locale_title: "РњРѕРІР°",
+    locale_search_placeholder: "РџРѕС€СѓРє РјРѕРІРё Р°Р±Рѕ РєСЂР°С—РЅРё",
+    locale_select_aria: "РћР±СЂР°С‚Рё РјРѕРІСѓ",
+    locale_empty: "РќС–С‡РѕРіРѕ РЅРµ Р·РЅР°Р№РґРµРЅРѕ",
+    locale_open_aria: "Р’С–РґРєСЂРёС‚Рё СЃС‚РѕСЂС–РЅРєСѓ РјРѕРІРё ({language})",
+    language_page_title: "РњРѕРІР°",
+    language_page_back_aria: "РќР°Р·Р°Рґ Сѓ РїСЂРѕС„С–Р»СЊ",
+    settings_open_aria: "Р’С–РґРєСЂРёС‚Рё РЅР°Р»Р°С€С‚СѓРІР°РЅРЅСЏ",
+    settings_page_title: "РќР°Р»Р°С€С‚СѓРІР°РЅРЅСЏ",
+    settings_back_aria: "РќР°Р·Р°Рґ Сѓ РїСЂРѕС„С–Р»СЊ",
+    settings_language_title: "РњРѕРІР°",
+    settings_language_value: "РћР±СЂР°С‚Рё РјРѕРІСѓ С–РЅС‚РµСЂС„РµР№СЃСѓ",
+    settings_language_aria: "Р’С–РґРєСЂРёС‚Рё РјРѕРІРЅС– РЅР°Р»Р°С€С‚СѓРІР°РЅРЅСЏ",
+    lang_ru_name: "Р РѕСЃС–Р№СЃСЊРєР°",
+    lang_ru_country: "Р РѕСЃС–СЏ",
+    lang_en_name: "РђРЅРіР»С–Р№СЃСЊРєР°",
     lang_en_country: "United Kingdom",
-    lang_uk_name: "Українська",
-    lang_uk_country: "Україна",
+    lang_uk_name: "РЈРєСЂР°С—РЅСЃСЊРєР°",
+    lang_uk_country: "РЈРєСЂР°С—РЅР°",
   },
 };
 
@@ -672,7 +703,15 @@ const state = {
     shortParams: {},
     buttonKey: "wallet_connect",
     balanceLoading: false,
+    lastBalanceText: "",
+    lastPositiveBalanceAt: 0,
   },
+  nftTapGuard: {
+    lockUntil: 0,
+    recentTs: [],
+    cardLastTapAt: {},
+  },
+  nftAnimationActiveIds: {},
   fair: {
     nonce: 0,
     serverSeed: "",
@@ -720,8 +759,8 @@ const CP1251_CHAR_TO_BYTE = (() => {
 function looksLikeMojibakeText(value) {
   const raw = String(value ?? "");
   if (!raw) return false;
-  if (raw.includes("вЂ") || raw.includes("в„")) return true;
-  const chunks = raw.match(/[РС][А-Яа-яЁёЇїІіЄє]/g) || [];
+  if (raw.includes("РІР‚") || raw.includes("РІвЂћ")) return true;
+  const chunks = raw.match(/[РС][^\s]/g) || [];
   return chunks.length >= 2;
 }
 
@@ -750,9 +789,9 @@ function fixMojibakeText(value) {
   if (!raw || !looksLikeMojibakeText(raw)) return raw;
 
   const decoded = decodeCp1251Utf8Mojibake(raw);
-  if (!decoded || decoded === raw || decoded.includes("�")) return raw;
+  if (!decoded || decoded === raw || decoded.includes("пїЅ")) return raw;
 
-  const decodedLetters = (decoded.match(/[A-Za-zА-Яа-яЁёЇїІіЄє]/g) || []).length;
+  const decodedLetters = (decoded.match(/[\p{L}]/gu) || []).length;
   if (decodedLetters === 0 && !decoded.includes("•")) return raw;
   return decoded;
 }
@@ -1144,6 +1183,89 @@ function hideElementById(id, hidden) {
   const element = document.getElementById(id);
   if (!element) return;
   element.classList.toggle("hidden", hidden);
+}
+
+function consumeNftCardTap(cardKey = "") {
+  const key = String(cardKey || "").trim();
+  const now = nowMs();
+  const guard = state.nftTapGuard || (state.nftTapGuard = {
+    lockUntil: 0,
+    recentTs: [],
+    cardLastTapAt: {},
+  });
+
+  if (toNumber(guard.lockUntil, 0) > now) {
+    return false;
+  }
+
+  const recent = safeArray(guard.recentTs)
+    .map((ts) => Math.floor(toNumber(ts, 0)))
+    .filter((ts) => now - ts <= NFT_CARD_SPAM_WINDOW_MS);
+  guard.recentTs = recent;
+
+  if (recent.length >= NFT_CARD_MAX_TAPS_PER_WINDOW) {
+    guard.lockUntil = now + NFT_CARD_SPAM_LOCK_MS;
+    return false;
+  }
+
+  if (key) {
+    const lastTap = Math.floor(toNumber(guard.cardLastTapAt[key], 0));
+    if (lastTap > 0 && now - lastTap < NFT_CARD_PER_ITEM_COOLDOWN_MS) {
+      return false;
+    }
+    guard.cardLastTapAt[key] = now;
+  }
+
+  recent.push(now);
+
+  const keys = Object.keys(guard.cardLastTapAt);
+  if (keys.length > 260) {
+    keys.forEach((entryKey) => {
+      const ts = Math.floor(toNumber(guard.cardLastTapAt[entryKey], 0));
+      if (now - ts > 5 * 60 * 1000) {
+        delete guard.cardLastTapAt[entryKey];
+      }
+    });
+  }
+
+  return true;
+}
+
+function isNftAnimationActive(nftId) {
+  const key = String(nftId || "").trim();
+  if (!key) return false;
+  return Boolean(state.nftAnimationActiveIds?.[key]);
+}
+
+function markNftAnimationActive(nftId) {
+  const key = String(nftId || "").trim();
+  if (!key) return;
+  if (!state.nftAnimationActiveIds || typeof state.nftAnimationActiveIds !== "object") {
+    state.nftAnimationActiveIds = {};
+  }
+  state.nftAnimationActiveIds[key] = nowMs();
+
+  const keys = Object.keys(state.nftAnimationActiveIds);
+  if (keys.length > 600) {
+    const cutoff = nowMs() - 24 * 60 * 60 * 1000;
+    keys.forEach((entryKey) => {
+      if (toNumber(state.nftAnimationActiveIds[entryKey], 0) < cutoff) {
+        delete state.nftAnimationActiveIds[entryKey];
+      }
+    });
+  }
+}
+
+function activateNftCardAnimation(card) {
+  if (!card) return false;
+  const activate = card.__activateNftAnimation;
+  if (typeof activate !== "function") return false;
+  const activated = activate();
+  if (activated) {
+    card.classList.add("is-animation-active");
+    markNftAnimationActive(card.dataset.id);
+  }
+  return Boolean(activated);
 }
 
 async function copyTextToClipboard(text) {
@@ -1723,15 +1845,15 @@ function getUpgradeButtonLabel() {
 function formatTargetLimitNote(maxTargetValue) {
   const maxText = formatTon(maxTargetValue);
   if (state.locale === "en") return `Max target: ${maxText}`;
-  if (state.locale === "uk") return `Макс ціль: ${maxText}`;
-  return `Макс цель: ${maxText}`;
+  if (state.locale === "uk") return `РњР°РєСЃ С†С–Р»СЊ: ${maxText}`;
+  return `РњР°РєСЃ С†РµР»СЊ: ${maxText}`;
 }
 
 function formatTargetLimitError(maxTargetValue) {
   const maxText = formatTon(maxTargetValue);
   if (state.locale === "en") return `Target is above limit (${maxText})`;
-  if (state.locale === "uk") return `Ціль вище ліміту (${maxText})`;
-  return `Цель выше лимита (${maxText})`;
+  if (state.locale === "uk") return `Р¦С–Р»СЊ РІРёС‰Рµ Р»С–РјС–С‚Сѓ (${maxText})`;
+  return `Р¦РµР»СЊ РІС‹С€Рµ Р»РёРјРёС‚Р° (${maxText})`;
 }
 
 function getUpgradeErrorMessage(error) {
@@ -2691,9 +2813,19 @@ async function fetchWalletTonBalance(address, chain = "") {
   if (!normalizedAddress) return null;
 
   const backendBalance = await fetchBackendWalletBalance(normalizedAddress, chain);
-  if (backendBalance !== null) {
-    return backendBalance;
-  }
+  const backendNumeric = toNumber(backendBalance, NaN);
+
+  const pickPreferredBalance = (clientBalance) => {
+    const clientNumeric = toNumber(clientBalance, NaN);
+    if (Number.isFinite(clientNumeric) && clientNumeric > 0) {
+      if (!Number.isFinite(backendNumeric) || backendNumeric <= 0) {
+        return clientBalance;
+      }
+      return clientNumeric >= backendNumeric ? clientBalance : backendBalance;
+    }
+    if (backendBalance !== null) return backendBalance;
+    return clientBalance;
+  };
 
   const addressCandidates = getTonAddressCandidates(normalizedAddress);
   const normalizedChain = normalizeTonChainId(chain);
@@ -2764,24 +2896,24 @@ async function fetchWalletTonBalance(address, chain = "") {
       const probe = await fetchBalanceForChain(fallbackChain);
       const probeNumeric = toNumber(probe.balance, NaN);
       if (probe.balance !== null && Number.isFinite(probeNumeric) && probeNumeric > 0) {
-        return probe.balance;
+        return pickPreferredBalance(probe.balance);
       }
     }
-    return primary.balance;
+    return pickPreferredBalance(primary.balance);
   }
 
   // If chain is unknown, never "mix" balances between mainnet/testnet.
   // Use testnet only when mainnet is unreachable.
   if (!allowFallback && primary.responded) {
-    return null;
+    return pickPreferredBalance(null);
   }
 
   const fallback = await fetchBalanceForChain(fallbackChain);
   if (fallback.balance !== null) {
-    return fallback.balance;
+    return pickPreferredBalance(fallback.balance);
   }
 
-  return null;
+  return pickPreferredBalance(null);
 }
 
 function parseTokenAmount(rawValue, decimals = 9) {
@@ -3744,7 +3876,7 @@ async function fetchTelegramProfileGifts(ownerAddress = "") {
     .map((item, index) => buildNftModelFromTelegramGift(item, index))
     .filter(Boolean);
 
-  if (!userId) return mergedInjected;
+  if (!userId && !ownerWallet) return mergedInjected;
 
   const endpointCandidates = [];
   const pushEndpoint = (value) => {
@@ -3813,7 +3945,9 @@ async function fetchTelegramProfileGifts(ownerAddress = "") {
         continue;
       }
 
-      url.searchParams.set("user_id", userId);
+      if (userId) {
+        url.searchParams.set("user_id", userId);
+      }
       if (state.currentUser?.username) {
         url.searchParams.set("username", String(state.currentUser.username).trim());
       }
@@ -4442,7 +4576,15 @@ async function fetchWalletMarketData(address, chain = "") {
   }
 
   const backendState = await fetchBackendMarketState(ownerAddress, chain);
-  if (backendState) {
+  const backendHasData = Boolean(
+    backendState
+    && (
+      safeArray(backendState.profileInventory).length > 0
+      || safeArray(backendState.inventory).length > 0
+      || safeArray(backendState.targets).length > 0
+    ),
+  );
+  if (backendHasData) {
     return backendState;
   }
 
@@ -4509,11 +4651,35 @@ async function fetchWalletMarketData(address, chain = "") {
     .sort((left, right) => left.value - right.value)
     .slice(0, MAX_TARGETS);
 
-  return {
+  const localState = {
     profileInventory: profileMerged,
     inventory: inventoryMerged,
     targets,
   };
+
+  if (backendState) {
+    const mergedTargets = mergeUniqueNfts(
+      safeArray(localState.targets),
+      safeArray(backendState.targets),
+    )
+      .filter((item) => Number.isFinite(toNumber(item?.value, NaN)) && toNumber(item?.value, NaN) > 0)
+      .sort((left, right) => left.value - right.value)
+      .slice(0, MAX_TARGETS);
+
+    return {
+      profileInventory: mergeUniqueNfts(
+        safeArray(localState.profileInventory),
+        safeArray(backendState.profileInventory),
+      ),
+      inventory: mergeUniqueNfts(
+        safeArray(localState.inventory),
+        safeArray(backendState.inventory),
+      ),
+      targets: mergedTargets,
+    };
+  }
+
+  return localState;
 }
 
 async function fetchTelegramOnlyMarketData() {
@@ -4543,8 +4709,8 @@ function normalizeDisplayName(name) {
   const raw = String(name ?? "").trim();
   if (!raw) return "";
 
-  const hasUpper = /[A-ZА-ЯЁ]/.test(raw);
-  const hasLower = /[a-zа-яё]/.test(raw);
+  const hasUpper = /\p{Lu}/u.test(raw);
+  const hasLower = /\p{Ll}/u.test(raw);
 
   if (!hasUpper || hasLower) return raw;
   return raw.toLowerCase().replace(/(^|[\s-])\S/g, (letter) => letter.toUpperCase());
@@ -4952,7 +5118,8 @@ function createNftVideoMediaNode(mediaUrls, posterUrls = []) {
   return video;
 }
 
-function createNftMediaNode(nft) {
+function createNftMediaNode(nft, options = {}) {
+  const activateOnCreate = options?.activateOnCreate === true;
   const spec = resolveNftMediaSpec(nft);
   const imageCandidates = spec.imageCandidates;
   const animationCandidates = spec.animationCandidates;
@@ -4967,51 +5134,79 @@ function createNftMediaNode(nft) {
     return image;
   };
 
-  if (videoAnimations.length > 0) {
-    const video = createNftVideoMediaNode(videoAnimations, imageCandidates);
-    if (video) {
-      const fallbackToImage = () => {
-        if (video.dataset.fallbackApplied === "1") return;
-        video.dataset.fallbackApplied = "1";
-        const fallbackNode = animatedImageNode() || staticImageNode();
-        if (fallbackNode && video.parentNode) {
-          video.replaceWith(fallbackNode);
-        }
+  const buildAnimatedNode = () => {
+    if (videoAnimations.length > 0) {
+      const video = createNftVideoMediaNode(videoAnimations, imageCandidates);
+      if (video) {
+        const fallbackToImage = () => {
+          if (video.dataset.fallbackApplied === "1") return;
+          video.dataset.fallbackApplied = "1";
+          const fallbackNode = animatedImageNode() || staticImageNode();
+          if (fallbackNode && video.parentNode) {
+            video.replaceWith(fallbackNode);
+          }
+        };
+
+        video.addEventListener("nft:video-exhausted", fallbackToImage, { once: true });
+        video.addEventListener("loadeddata", () => {
+          video.classList.add("is-ready");
+        }, { once: true });
+
+        return video;
+      }
+    }
+
+    if (imageAnimations.length > 0) {
+      const animatedImage = animatedImageNode();
+      if (animatedImage) {
+        animatedImage.addEventListener("nft:image-exhausted", () => {
+          if (animatedImage.dataset.fallbackApplied === "1") return;
+          animatedImage.dataset.fallbackApplied = "1";
+          const fallbackNode = staticImageNode();
+          if (fallbackNode && animatedImage.parentNode) {
+            animatedImage.replaceWith(fallbackNode);
+          }
+        }, { once: true });
+        return animatedImage;
+      }
+    }
+
+    return null;
+  };
+
+  const hasPlayableAnimation = videoAnimations.length > 0 || imageAnimations.length > 0;
+  if (hasPlayableAnimation) {
+    if (activateOnCreate) {
+      const animated = buildAnimatedNode();
+      return {
+        node: animated || staticImageNode(),
+        isAnimated: true,
+        activate: null,
       };
-
-      video.addEventListener("nft:video-exhausted", fallbackToImage, { once: true });
-      video.addEventListener("loadeddata", () => {
-        video.classList.add("is-ready");
-      }, { once: true });
-
-      return { node: video, isAnimated: true };
     }
-  }
 
-  if (imageAnimations.length > 0) {
-    const animatedImage = animatedImageNode();
-    if (animatedImage) {
-      animatedImage.addEventListener("nft:image-exhausted", () => {
-        if (animatedImage.dataset.fallbackApplied === "1") return;
-        animatedImage.dataset.fallbackApplied = "1";
-        const fallbackNode = staticImageNode();
-        if (fallbackNode && animatedImage.parentNode) {
-          animatedImage.replaceWith(fallbackNode);
-        }
-      }, { once: true });
-      return { node: animatedImage, isAnimated: true };
-    }
+    let activatedNode = null;
+    const previewNode = staticImageNode();
+    return {
+      node: previewNode,
+      isAnimated: true,
+      activate: () => {
+        if (activatedNode) return activatedNode;
+        activatedNode = buildAnimatedNode();
+        return activatedNode || previewNode;
+      },
+    };
   }
 
   const image = staticImageNode();
   if (image) {
-    return { node: image, isAnimated: false };
+    return { node: image, isAnimated: false, activate: null };
   }
 
-  return { node: null, isAnimated: false };
+  return { node: null, isAnimated: false, activate: null };
 }
 
-function createNftThumb(nft) {
+function createNftThumb(nft, options = {}) {
   const thumb = document.createElement("div");
   thumb.className = "nft-thumb";
   if (nft?.source === "telegram") {
@@ -5045,26 +5240,52 @@ function createNftThumb(nft) {
     thumb.append(bgPattern);
   }
 
-  const media = createNftMediaNode(nft);
+  const media = createNftMediaNode(nft, { activateOnCreate: options?.activateOnCreate === true });
+  let mediaNode = media?.node || null;
+  let animationBadge = null;
+
+  const isAnimationActiveByDefault = options?.activateOnCreate === true;
   if (media?.isAnimated) {
     thumb.classList.add("has-animation");
-    const animationBadge = document.createElement("span");
-    animationBadge.className = "nft-anim-badge";
+    thumb.classList.add(isAnimationActiveByDefault ? "is-animation-active" : "is-animation-paused");
+    animationBadge = document.createElement("span");
+    animationBadge.className = `nft-anim-badge${isAnimationActiveByDefault ? " is-hidden" : ""}`;
     animationBadge.innerHTML = `
       <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
         <path d="M4 3.2v9.6l8-4.8z" />
       </svg>
-      <span>LIVE</span>
+      <span>PLAY</span>
     `;
     thumb.append(animationBadge);
   }
-  if (media?.node) {
-    thumb.append(media.node);
+
+  if (mediaNode) {
+    thumb.append(mediaNode);
   } else {
     const fallback = document.createElement("span");
     fallback.className = "nft-media-fallback";
     fallback.textContent = String(nft.name || "NFT").trim().slice(0, 1).toUpperCase() || "N";
-    thumb.append(fallback);
+    mediaNode = fallback;
+    thumb.append(mediaNode);
+  }
+
+  if (media?.isAnimated && typeof media.activate === "function") {
+    thumb.__activateNftAnimation = () => {
+      const nextNode = media.activate();
+      if (!nextNode || nextNode === mediaNode) return false;
+      if (mediaNode && mediaNode.parentNode === thumb) {
+        mediaNode.replaceWith(nextNode);
+      } else {
+        thumb.append(nextNode);
+      }
+      mediaNode = nextNode;
+      thumb.classList.remove("is-animation-paused");
+      thumb.classList.add("is-animation-active");
+      if (animationBadge) {
+        animationBadge.classList.add("is-hidden");
+      }
+      return true;
+    };
   }
 
   const overlay = document.createElement("div");
@@ -5117,7 +5338,9 @@ function createOwnNftCard(nft, isActive) {
   card.type = "button";
   card.className = `nft-card${isActive ? " is-active" : ""}`;
   card.dataset.id = nft.id;
-  card.append(createNftThumb(nft), createNftCardBody(nft));
+  const thumb = createNftThumb(nft, { activateOnCreate: isNftAnimationActive(nft.id) });
+  card.__activateNftAnimation = thumb.__activateNftAnimation;
+  card.append(thumb, createNftCardBody(nft));
   if (isActive) {
     const check = document.createElement("span");
     check.className = "nft-checkmark";
@@ -5134,7 +5357,29 @@ function createOwnNftCard(nft, isActive) {
 function createProfileNftCard(nft) {
   const card = document.createElement("article");
   card.className = "profile-nft-card";
-  card.append(createNftThumb(nft), createNftCardBody(nft));
+  card.dataset.id = nft.id;
+  card.tabIndex = 0;
+  card.setAttribute("role", "button");
+  card.setAttribute("aria-label", `${nft.name || "NFT"}`);
+  const thumb = createNftThumb(nft, { activateOnCreate: isNftAnimationActive(nft.id) });
+  card.__activateNftAnimation = thumb.__activateNftAnimation;
+  card.append(thumb, createNftCardBody(nft));
+
+  const cardKey = `profile:${String(nft.id || "").trim()}`;
+  const onActivate = (event) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    if (!consumeNftCardTap(cardKey)) return;
+    activateNftCardAnimation(card);
+  };
+  card.addEventListener("click", onActivate);
+  card.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    onActivate(event);
+  });
+
   return card;
 }
 
@@ -5289,6 +5534,9 @@ function renderOwnNftCards() {
 
     card.addEventListener("click", () => {
       if (state.isSpinning) return;
+      const cardKey = `own:${String(nft.id || "").trim()}`;
+      if (!consumeNftCardTap(cardKey)) return;
+      activateNftCardAnimation(card);
       const changed = toggleSelectedSourceNft(nft.id);
       if (!changed) return;
       ensureSelectedIds();
@@ -5829,6 +6077,94 @@ function applyUserProfile(user) {
   setAvatar(document.getElementById("nav-avatar"), user);
 }
 
+function parseJsonObject(rawValue) {
+  const raw = String(rawValue ?? "").trim();
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeDecodeURIComponent(rawValue) {
+  const raw = String(rawValue ?? "");
+  if (!raw) return "";
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function parseTelegramUserFromInitData(initDataRaw) {
+  const initData = String(initDataRaw ?? "").trim();
+  if (!initData) return null;
+
+  let params;
+  try {
+    params = new URLSearchParams(initData);
+  } catch {
+    return null;
+  }
+
+  const userRaw = String(params.get("user") || "").trim();
+  if (!userRaw) return null;
+
+  const candidates = [
+    userRaw,
+    safeDecodeURIComponent(userRaw),
+    safeDecodeURIComponent(safeDecodeURIComponent(userRaw)),
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = parseJsonObject(candidate);
+    if (parsed?.id !== undefined && parsed?.id !== null) return parsed;
+  }
+
+  return null;
+}
+
+function parseTelegramUserFromLocation() {
+  const rawHash = String(window.location.hash || "").replace(/^#/, "");
+  const rawSearch = String(window.location.search || "").replace(/^\?/, "");
+  const candidates = [rawHash, rawSearch].filter(Boolean);
+
+  for (const raw of candidates) {
+    let params = null;
+    try {
+      params = new URLSearchParams(raw);
+    } catch {
+      params = null;
+    }
+
+    const tgDataValue = params ? String(params.get("tgWebAppData") || "").trim() : "";
+    if (tgDataValue) {
+      const decoded = safeDecodeURIComponent(tgDataValue);
+      const fromTgData = parseTelegramUserFromInitData(decoded);
+      if (fromTgData) return fromTgData;
+    }
+
+    const directUser = parseTelegramUserFromInitData(raw);
+    if (directUser) return directUser;
+  }
+
+  return null;
+}
+
+function resolveTelegramUser(tg) {
+  const unsafeUser = tg?.initDataUnsafe?.user;
+  if (unsafeUser && typeof unsafeUser === "object") {
+    return unsafeUser;
+  }
+
+  const fromInitData = parseTelegramUserFromInitData(tg?.initData);
+  if (fromInitData) return fromInitData;
+
+  return parseTelegramUserFromLocation();
+}
+
 function setupTelegramUser() {
 
   const tg = window.Telegram?.WebApp;
@@ -5845,11 +6181,40 @@ function setupTelegramUser() {
     if (typeof tg.setHeaderColor === "function") tg.setHeaderColor("#0a0b0f");
     if (typeof tg.disableVerticalSwipes === "function") tg.disableVerticalSwipes();
 
-    const user = tg.initDataUnsafe?.user;
-    const mergedUser = user ? { ...fallbackUser, ...user } : { ...fallbackUser };
-    state.currentUser = mergedUser;
-    state.telegramLanguage = String(user?.language_code || "").trim();
-    applyUserProfile(mergedUser);
+    const hydrateUser = () => {
+      const resolvedUser = resolveTelegramUser(tg);
+      if (!resolvedUser) return false;
+      const prevUserId = String(state.currentUser?.id ?? "").trim();
+      const mergedUser = { ...fallbackUser, ...resolvedUser };
+      state.currentUser = mergedUser;
+      state.telegramLanguage = String(resolvedUser?.language_code || "").trim();
+      applyUserProfile(mergedUser);
+      const nextUserId = String(mergedUser?.id ?? "").trim();
+      if (nextUserId && nextUserId !== prevUserId) {
+        if (typeof state.refreshTelegramGifts === "function") {
+          void state.refreshTelegramGifts();
+        }
+        if (typeof state.refreshWalletData === "function" && state.tonAddress) {
+          void state.refreshWalletData();
+        }
+      }
+      return true;
+    };
+
+    if (hydrateUser()) return;
+
+    state.currentUser = { ...fallbackUser };
+    applyUserProfile(state.currentUser);
+
+    let retries = 0;
+    const retryHydration = () => {
+      if (hydrateUser()) return;
+      retries += 1;
+      if (retries < 3) {
+        setTimeout(retryHydration, 280 * retries);
+      }
+    };
+    setTimeout(retryHydration, 180);
   } catch (error) {
     console.error("Telegram WebApp init error:", error);
     state.currentUser = { ...fallbackUser };
@@ -5939,6 +6304,30 @@ function setupTonConnect() {
     const balance = await fetchWalletTonBalance(address, chain);
     if (token !== balanceRequestToken) return;
     state.walletUi.balanceLoading = false;
+
+    const numeric = toNumber(balance, NaN);
+    if (balance !== null && Number.isFinite(numeric) && numeric > 0) {
+      const text = `${balance} TON`;
+      state.walletUi.lastBalanceText = text;
+      state.walletUi.lastPositiveBalanceAt = nowMs();
+      walletBubbleBalance.textContent = text;
+      return;
+    }
+
+    const recentPositiveAge = nowMs() - toNumber(state.walletUi.lastPositiveBalanceAt, 0);
+    const hasRecentPositive = Boolean(state.walletUi.lastBalanceText) && recentPositiveAge >= 0 && recentPositiveAge <= 5 * 60 * 1000;
+
+    if (hasRecentPositive && (balance === null || (Number.isFinite(numeric) && numeric <= 0))) {
+      walletBubbleBalance.textContent = state.walletUi.lastBalanceText;
+      if (Number.isFinite(numeric) && numeric <= 0) {
+        window.setTimeout(() => {
+          if (!state.tonAddress) return;
+          void loadWalletBalance(state.tonAddress, state.tonChain);
+        }, 1800);
+      }
+      return;
+    }
+
     walletBubbleBalance.textContent = balance !== null ? `${balance} TON` : "-- TON";
   };
 
@@ -6030,6 +6419,24 @@ function setupTonConnect() {
     }
 
     marketData.targets = preferredTargets;
+
+    const nextProfile = safeArray(marketData.profileInventory);
+    const nextInventory = safeArray(marketData.inventory);
+    const currentProfile = safeArray(state.data.profileInventory);
+    const currentInventory = safeArray(state.data.inventory);
+    const currentTargets = safeArray(state.data.targets);
+    const nextHasData = nextProfile.length > 0 || nextInventory.length > 0;
+    const currentHasData = currentProfile.length > 0 || currentInventory.length > 0;
+
+    if (!nextHasData && currentHasData) {
+      marketData.profileInventory = currentProfile;
+      marketData.inventory = currentInventory;
+      if (safeArray(marketData.targets).length === 0 && currentTargets.length > 0) {
+        marketData.targets = currentTargets;
+      }
+      setWalletShort("wallet_syncing_nft");
+    }
+
     applyWalletMarketData(marketData);
 
     if (marketData.profileInventory.length === 0) {
@@ -6127,6 +6534,8 @@ function setupTonConnect() {
       state.tonChain = chain;
       if (isNewConnection) {
         recordAnalytics("walletConnects");
+        state.walletUi.lastBalanceText = "";
+        state.walletUi.lastPositiveBalanceAt = 0;
       }
 
       setWalletShort("wallet_syncing_nft");
@@ -6138,6 +6547,8 @@ function setupTonConnect() {
       stopBalancePolling();
       stopNftPolling();
       state.walletUi.balanceLoading = false;
+      state.walletUi.lastBalanceText = "";
+      state.walletUi.lastPositiveBalanceAt = 0;
       walletBubbleBalance.textContent = "-- TON";
       setWalletShort("wallet_not_connected");
       void loadAppData().then(() => {

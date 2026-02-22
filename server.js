@@ -1,6 +1,9 @@
 const http = require("http");
 const { URL } = require("url");
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
+const Database = require("better-sqlite3");
 
 const PORT = toInt(process.env.PORT, 8787);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -25,6 +28,7 @@ const NFT_MAX_PAGES = clamp(toInt(process.env.NFT_MAX_PAGES, 4), 1, 10);
 const COLLECTION_SCAN_LIMIT = clamp(toInt(process.env.COLLECTION_SCAN_LIMIT, 60), 20, 200);
 const MAX_COLLECTIONS_FOR_MARKET = clamp(toInt(process.env.MAX_COLLECTIONS_FOR_MARKET, 6), 1, 20);
 const MAX_TARGETS = clamp(toInt(process.env.MAX_TARGETS, 60), 10, 300);
+const DB_PATH = String(process.env.DB_PATH || "./data/upnft.sqlite").trim();
 
 const TON_CHAIN_MAINNET = "-239";
 const TON_CHAIN_TESTNET = "-3";
@@ -33,6 +37,20 @@ const sessions = new Map();
 const requestIndex = new Map();
 const walletState = new Map();
 const profileGiftStore = new Map();
+let sqliteDb = null;
+let sqliteEnabled = false;
+const sqliteStmt = {
+  upsertSession: null,
+  deleteSession: null,
+  listSessions: null,
+  upsertRequestIndex: null,
+  deleteRequestIndex: null,
+  listRequestIndex: null,
+  upsertWalletState: null,
+  listWalletState: null,
+  upsertProfileGifts: null,
+  listProfileGifts: null,
+};
 
 const injectedGifts = safeParseJson(process.env.TELEGRAM_GIFTS_JSON, []);
 
@@ -67,6 +85,209 @@ function safeParseJson(raw, fallback) {
     return JSON.parse(String(raw ?? ""));
   } catch {
     return fallback;
+  }
+}
+
+function logSqliteError(prefix, error) {
+  const text = error && error.message ? error.message : String(error || "unknown");
+  // eslint-disable-next-line no-console
+  console.error(`[upnft-backend] ${prefix}: ${text}`);
+}
+
+function sqliteRun(statement, ...args) {
+  if (!sqliteEnabled || !statement) return;
+  try {
+    statement.run(...args);
+  } catch (error) {
+    logSqliteError("sqlite write failed", error);
+  }
+}
+
+function persistSession(session) {
+  if (!sqliteEnabled || !session || !session.id) return;
+  sqliteRun(
+    sqliteStmt.upsertSession,
+    String(session.id),
+    JSON.stringify(session),
+    now(),
+  );
+}
+
+function deleteSession(sessionId) {
+  if (!sqliteEnabled) return;
+  const key = String(sessionId || "").trim();
+  if (!key) return;
+  sqliteRun(sqliteStmt.deleteSession, key);
+}
+
+function persistRequestIndex(requestKey, sessionId) {
+  if (!sqliteEnabled) return;
+  const key = String(requestKey || "").trim();
+  const id = String(sessionId || "").trim();
+  if (!key || !id) return;
+  sqliteRun(sqliteStmt.upsertRequestIndex, key, id, now());
+}
+
+function deleteRequestIndex(requestKey) {
+  if (!sqliteEnabled) return;
+  const key = String(requestKey || "").trim();
+  if (!key) return;
+  sqliteRun(sqliteStmt.deleteRequestIndex, key);
+}
+
+function persistWalletState(walletKey, state) {
+  if (!sqliteEnabled) return;
+  const key = String(walletKey || "").trim();
+  if (!key || !state || typeof state !== "object") return;
+  sqliteRun(sqliteStmt.upsertWalletState, key, JSON.stringify(state), now());
+}
+
+function persistProfileGifts(userId, gifts) {
+  if (!sqliteEnabled) return;
+  const key = String(userId || "").trim();
+  if (!key) return;
+  sqliteRun(sqliteStmt.upsertProfileGifts, key, JSON.stringify(safeArray(gifts)), now());
+}
+
+function loadPersistentState() {
+  if (!sqliteEnabled) return;
+
+  sessions.clear();
+  requestIndex.clear();
+  walletState.clear();
+  profileGiftStore.clear();
+
+  try {
+    const sessionRows = sqliteStmt.listSessions.all();
+    for (const row of sessionRows) {
+      const payload = safeParseJson(row?.payload_json, null);
+      if (!payload || typeof payload !== "object") continue;
+      const id = String(payload.id || row.session_id || "").trim();
+      if (!id) continue;
+      payload.id = id;
+      sessions.set(id, payload);
+    }
+
+    const requestRows = sqliteStmt.listRequestIndex.all();
+    for (const row of requestRows) {
+      const requestKey = String(row?.request_key || "").trim();
+      const sessionId = String(row?.session_id || "").trim();
+      if (!requestKey || !sessionId) continue;
+      if (!sessions.has(sessionId)) {
+        deleteRequestIndex(requestKey);
+        continue;
+      }
+      requestIndex.set(requestKey, sessionId);
+    }
+
+    const walletRows = sqliteStmt.listWalletState.all();
+    for (const row of walletRows) {
+      const walletKey = String(row?.wallet_key || "").trim();
+      const payload = safeParseJson(row?.payload_json, null);
+      if (!walletKey || !payload || typeof payload !== "object") continue;
+      const normalizedPayload = {
+        cooldownUntil: toInt(payload.cooldownUntil, 0),
+        activeSessionId: String(payload.activeSessionId || "").trim(),
+      };
+      walletState.set(walletKey, normalizedPayload);
+    }
+
+    const giftsRows = sqliteStmt.listProfileGifts.all();
+    for (const row of giftsRows) {
+      const userId = String(row?.user_id || "").trim();
+      const payload = safeParseJson(row?.gifts_json, []);
+      if (!userId) continue;
+      profileGiftStore.set(userId, dedupeGifts(safeArray(payload)));
+    }
+  } catch (error) {
+    logSqliteError("sqlite load failed", error);
+  }
+}
+
+function initPersistentStorage() {
+  try {
+    const resolvedPath = path.resolve(DB_PATH);
+    const dir = path.dirname(resolvedPath);
+    fs.mkdirSync(dir, { recursive: true });
+
+    sqliteDb = new Database(resolvedPath);
+    sqliteDb.pragma("journal_mode = WAL");
+    sqliteDb.pragma("synchronous = NORMAL");
+
+    sqliteDb.exec(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        session_id TEXT PRIMARY KEY,
+        payload_json TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS request_index (
+        request_key TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS wallet_state (
+        wallet_key TEXT PRIMARY KEY,
+        payload_json TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS profile_gifts (
+        user_id TEXT PRIMARY KEY,
+        gifts_json TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+    `);
+
+    sqliteStmt.upsertSession = sqliteDb.prepare(`
+      INSERT INTO sessions (session_id, payload_json, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(session_id) DO UPDATE SET
+        payload_json = excluded.payload_json,
+        updated_at = excluded.updated_at
+    `);
+    sqliteStmt.deleteSession = sqliteDb.prepare("DELETE FROM sessions WHERE session_id = ?");
+    sqliteStmt.listSessions = sqliteDb.prepare("SELECT session_id, payload_json FROM sessions");
+
+    sqliteStmt.upsertRequestIndex = sqliteDb.prepare(`
+      INSERT INTO request_index (request_key, session_id, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(request_key) DO UPDATE SET
+        session_id = excluded.session_id,
+        updated_at = excluded.updated_at
+    `);
+    sqliteStmt.deleteRequestIndex = sqliteDb.prepare("DELETE FROM request_index WHERE request_key = ?");
+    sqliteStmt.listRequestIndex = sqliteDb.prepare("SELECT request_key, session_id FROM request_index");
+
+    sqliteStmt.upsertWalletState = sqliteDb.prepare(`
+      INSERT INTO wallet_state (wallet_key, payload_json, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(wallet_key) DO UPDATE SET
+        payload_json = excluded.payload_json,
+        updated_at = excluded.updated_at
+    `);
+    sqliteStmt.listWalletState = sqliteDb.prepare("SELECT wallet_key, payload_json FROM wallet_state");
+
+    sqliteStmt.upsertProfileGifts = sqliteDb.prepare(`
+      INSERT INTO profile_gifts (user_id, gifts_json, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET
+        gifts_json = excluded.gifts_json,
+        updated_at = excluded.updated_at
+    `);
+    sqliteStmt.listProfileGifts = sqliteDb.prepare("SELECT user_id, gifts_json FROM profile_gifts");
+
+    sqliteEnabled = true;
+    loadPersistentState();
+    cleanupStore();
+
+    // eslint-disable-next-line no-console
+    console.log(`[upnft-backend] sqlite enabled at ${resolvedPath}`);
+  } catch (error) {
+    sqliteEnabled = false;
+    sqliteDb = null;
+    logSqliteError("sqlite init failed, running in-memory mode", error);
   }
 }
 
@@ -1409,6 +1630,7 @@ function clearActiveWalletSession(session) {
     walletMeta.activeSessionId = "";
     walletMeta.cooldownUntil = now() + COOLDOWN_MS;
     walletState.set(key, walletMeta);
+    persistWalletState(key, walletMeta);
   }
 }
 
@@ -1449,9 +1671,12 @@ function cleanupStore() {
     const staleExpired = current > session.expiresAt + 2 * 60 * 1000;
     if (!staleResolved && !staleExpired) continue;
 
+    clearActiveWalletSession(session);
     sessions.delete(id);
+    deleteSession(id);
     const reqKey = `${normalizeKey(session.wallet)}:${session.clientRequestId}`;
     requestIndex.delete(reqKey);
+    deleteRequestIndex(reqKey);
   }
 }
 
@@ -1533,6 +1758,8 @@ async function handlePrepare(req, res) {
       sendJson(res, 200, buildPrepareResponse(existing));
       return;
     }
+    requestIndex.delete(requestKey);
+    deleteRequestIndex(requestKey);
   }
 
   const walletMeta = walletState.get(walletKey) || { cooldownUntil: 0, activeSessionId: "" };
@@ -1552,10 +1779,14 @@ async function handlePrepare(req, res) {
   session.sourceNftIds = sourceIds;
   sessions.set(session.id, session);
   requestIndex.set(requestKey, session.id);
-  walletState.set(walletKey, {
+  const nextWalletMeta = {
     cooldownUntil: now() + COOLDOWN_MS,
     activeSessionId: session.id,
-  });
+  };
+  walletState.set(walletKey, nextWalletMeta);
+  persistSession(session);
+  persistRequestIndex(requestKey, session.id);
+  persistWalletState(walletKey, nextWalletMeta);
 
   sendJson(res, 200, buildPrepareResponse(session));
 }
@@ -1596,6 +1827,7 @@ async function handleResolve(req, res) {
   if (session.expiresAt <= now()) {
     clearActiveWalletSession(session);
     session.status = "aborted";
+    persistSession(session);
     sendJson(res, 409, { ok: false, error_code: "offer_timeout" });
     return;
   }
@@ -1609,6 +1841,7 @@ async function handleResolve(req, res) {
   session.status = "resolved";
   session.resolvePayload = payload;
   clearActiveWalletSession(session);
+  persistSession(session);
 
   sendJson(res, 200, payload);
 }
@@ -1628,6 +1861,7 @@ async function handleAbort(req, res) {
     if (session && session.status !== "resolved") {
       session.status = "aborted";
       clearActiveWalletSession(session);
+      persistSession(session);
     }
   }
 
@@ -1651,6 +1885,7 @@ async function handleSetGifts(req, res) {
   }
 
   profileGiftStore.set(userId, gifts);
+  persistProfileGifts(userId, gifts);
   sendJson(res, 200, { ok: true, user_id: userId, count: gifts.length });
 }
 
@@ -1753,6 +1988,8 @@ async function handleGifts(reqUrl, res) {
     gifts,
   });
 }
+
+initPersistentStorage();
 
 const server = http.createServer(async (req, res) => {
   const method = String(req.method || "GET").toUpperCase();
