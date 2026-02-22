@@ -12,11 +12,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=2026-02-22-10">
+  <link rel="stylesheet" href="./styles.css?v=2026-02-22-11">
 
   <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
   <script defer src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-  <script defer src="./app.js?v=2026-02-22-10"></script>
+  <script defer src="./app.js?v=2026-02-22-11"></script>
 </head>
 <body>
   <main class="app-shell">
@@ -138,28 +138,37 @@
   <nav class="bottom-nav" aria-label="Навигация">
     <button class="nav-btn" data-tab="tasks" type="button" aria-label="Задания">
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M7 5h10M7 12h10M7 19h6" />
+        <path d="M10 6h10M10 12h10M10 18h10" />
+        <path d="m4 6 1.6 1.6L8 5.2" />
+        <path d="m4 12 1.6 1.6L8 11.2" />
+        <path d="m4 18 1.6 1.6L8 17.2" />
       </svg>
       <span>Задания</span>
     </button>
 
     <button class="nav-btn is-active" data-tab="upgrades" type="button" aria-label="Апгрейды">
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 3v18M5 10l7-7 7 7M5 14l7 7 7-7" />
+        <path d="M4 16l6-6 4 4 6-6" />
+        <path d="M16 8h4v4" />
       </svg>
       <span>Апгрейды</span>
     </button>
 
     <button class="nav-btn" data-tab="cases" type="button" aria-label="Кейсы">
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Zm5-4h8l2 4H6l2-4Z" />
+        <path d="M4 9h16a1 1 0 0 1 1 1v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a1 1 0 0 1 1-1Z" />
+        <path d="M9 9V7a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+        <path d="M3 13h18" />
       </svg>
       <span>Кейсы</span>
     </button>
 
     <button class="nav-btn" data-tab="bonuses" type="button" aria-label="Бонусы">
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="m12 3 2.6 5.3L20 9l-4 4 .9 5.6L12 16l-4.9 2.6L8 13 4 9l5.4-.7L12 3Z" />
+        <path d="M3 8h18v4H3z" />
+        <path d="M5 12h14v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z" />
+        <path d="M12 8v14" />
+        <path d="M12 8H9a2 2 0 1 1 0-4c2 0 3 4 3 4Zm0 0h3a2 2 0 1 0 0-4c-2 0-3 4-3 4Z" />
       </svg>
       <span>Бонусы</span>
     </button>
