@@ -25,7 +25,7 @@ body {
 body {
   margin: 0;
   overflow: hidden;
-  font-family: "Manrope", sans-serif;
+  font-family: "Manrope", "Segoe UI", "Helvetica Neue", sans-serif;
   color: var(--text);
   background:
     radial-gradient(900px 550px at 6% -20%, #1a2234 0%, transparent 70%),
@@ -38,7 +38,7 @@ body {
 h1,
 h2 {
   margin: 0;
-  font-family: "Manrope", sans-serif;
+  font-family: "Manrope", "Segoe UI", "Helvetica Neue", sans-serif;
 }
 
 p {
@@ -289,7 +289,7 @@ p {
   );
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 18px), #000 calc(100% - 18px));
   mask: radial-gradient(farthest-side, transparent calc(100% - 18px), #000 calc(100% - 18px));
-  opacity: 0.65;
+  opacity: 0.45;
 }
 
 .chance-sheen {
@@ -325,34 +325,19 @@ p {
   position: absolute;
   top: 0;
   left: 50%;
-  width: 34px;
-  height: 16px;
-  transform: translate(-50%, -57%);
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+  width: 30px;
+  height: 12px;
+  transform: translate(-50%, -60%);
+  overflow: visible;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.32));
 }
 
-.orbit-arrow::before,
-.orbit-arrow::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-}
-
-.orbit-arrow::before {
-  left: 0;
-  width: 19px;
-  height: 5px;
-  transform: translateY(-50%);
-  border-radius: 999px;
-  background: linear-gradient(90deg, #f4f6ff, #c8d1e8);
-}
-
-.orbit-arrow::after {
-  right: 0;
-  transform: translateY(-50%);
-  border-top: 8px solid transparent;
-  border-bottom: 8px solid transparent;
-  border-left: 14px solid #dfe7ff;
+.orbit-arrow path {
+  fill: none;
+  stroke: #f2f6ff;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .math-note {
@@ -410,8 +395,7 @@ p {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  flex: 1;
-  min-height: 0;
+  max-height: 232px;
   overflow: auto;
   padding-right: 2px;
 }
@@ -522,21 +506,21 @@ p {
 
 .profile-screen {
   padding-top: 2px;
-  gap: 8px;
+  gap: 10px;
   overflow: hidden;
 }
 
 .profile-top {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .profile-avatar,
 .nav-avatar {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   overflow: hidden;
   border: 1px solid #424a5e;
@@ -559,76 +543,111 @@ p {
   object-fit: cover;
 }
 
+.profile-meta {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
 .profile-meta h2 {
-  font-size: 32px;
-  line-height: 0.9;
+  font-size: clamp(22px, 6vw, 28px);
+  line-height: 0.95;
   font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-subline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .profile-meta p {
-  margin-top: 0;
+  margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .profile-meta small {
-  display: block;
-  margin-top: 0;
-  color: #c5cad8;
+  margin: 0;
   font-size: 11px;
 }
 
+.profile-id {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line-soft);
+  color: #c5cad8;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .profile-rank {
+  display: grid;
+  place-items: center;
   text-align: center;
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 5px 8px;
-  min-width: 56px;
+  padding: 6px 10px;
+  min-width: 62px;
 }
 
 .profile-rank span {
   display: block;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 10px;
+  line-height: 1;
 }
 
 .profile-rank strong {
-  font-size: 12px;
+  margin-top: 1px;
+  font-size: 13px;
+  line-height: 1.1;
 }
 
 .stat-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
-  align-items: start;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .stat-row div {
-  padding-top: 2px;
-  padding-right: 8px;
+  padding: 7px 8px;
 }
 
 .stat-row div + div {
   border-left: 1px solid var(--line-soft);
-  padding-left: 10px;
 }
 
 .stat-row span {
   display: block;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .stat-row strong {
   display: block;
-  margin-top: 1px;
-  font-size: 16px;
+  margin-top: 2px;
+  font-size: 22px;
+  line-height: 1;
 }
 
 .wallet-btn {
-  height: 44px;
+  height: 42px;
   width: 100%;
   align-self: stretch;
   padding: 0 14px;
@@ -640,7 +659,7 @@ p {
     0 8px 18px rgba(8, 121, 214, 0.28);
   color: #ffffff;
   font-family: inherit;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
   cursor: pointer;
   display: inline-flex;
@@ -660,7 +679,7 @@ p {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 9px;
   width: 100%;
   line-height: 1;
 }
@@ -677,31 +696,31 @@ p {
 
 .wallet-btn-text {
   display: block;
-  line-height: 1;
-  transform: translateY(-0.5px);
+  line-height: 1.05;
 }
 
 .wallet-short {
-  margin-top: -2px;
+  min-height: 16px;
   color: var(--muted);
   font-size: 12px;
+  line-height: 1.2;
 }
 
 .profile-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  gap: 8px;
 }
 
 .profile-tab-btn {
-  height: 36px;
+  height: 38px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: transparent;
   color: #c6ccda;
   font-family: inherit;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
 }
 
@@ -714,7 +733,7 @@ p {
   display: none;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  max-height: 220px;
+  max-height: 205px;
   overflow: auto;
   padding-right: 2px;
 }
@@ -840,6 +859,24 @@ p {
 
   .profile-nft-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .profile-avatar {
+    width: 46px;
+    height: 46px;
+  }
+
+  .profile-meta h2 {
+    font-size: 22px;
+  }
+
+  .profile-rank {
+    min-width: 56px;
+    padding: 5px 8px;
+  }
+
+  .stat-row strong {
+    font-size: 19px;
   }
 }
 

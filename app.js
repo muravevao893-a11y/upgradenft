@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-11";
+const APP_VERSION = "2026-02-22-13";
 
 const tabMeta = {
   tasks: {
@@ -111,6 +111,24 @@ function formatTon(value) {
 function shortAddress(address) {
   if (!address || address.length < 12) return address || "-";
   return `${address.slice(0, 6)}...${address.slice(-6)}`;
+}
+
+function shortUserId(userId) {
+  const raw = String(userId ?? "").trim();
+  if (!raw) return "";
+  if (raw.length <= 9) return raw;
+  return `${raw.slice(0, 4)}...${raw.slice(-4)}`;
+}
+
+function normalizeDisplayName(name) {
+  const raw = String(name ?? "").trim();
+  if (!raw) return "";
+
+  const hasUpper = /[A-ZА-ЯЁ]/.test(raw);
+  const hasLower = /[a-zа-яё]/.test(raw);
+
+  if (!hasUpper || hasLower) return raw;
+  return raw.toLowerCase().replace(/(^|[\s-])\S/g, (letter) => letter.toUpperCase());
 }
 
 function normalizeNftList(rawList, prefix) {
@@ -246,6 +264,7 @@ function setupTabs() {
 
     title.textContent = tabMeta[nextTab].title;
     subtitle.textContent = tabMeta[nextTab].subtitle;
+    subtitle.classList.toggle("hidden", nextTab === "profile");
   };
 
   buttons.forEach((button) => {
@@ -411,7 +430,7 @@ function renderTargetChips() {
     list.append(chip);
   });
 
-  hideElementById("target-empty", state.data.targets.length > 0);
+  hideElementById("target-empty", true);
 }
 
 function renderOwnNftCards() {
@@ -648,12 +667,26 @@ function setAvatar(container, user) {
 }
 
 function applyUserProfile(user) {
-  const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ") || "Гость";
-  const handle = user.username ? `@${user.username}` : "@без_username";
+  const fullNameRaw = [user.first_name, user.last_name].filter(Boolean).join(" ");
+  const fullName = normalizeDisplayName(fullNameRaw) || "Гость";
+  const handle = user.username ? `@${String(user.username).trim()}` : "";
+  const compactId = shortUserId(user.id);
 
-  document.getElementById("profile-name").textContent = fullName;
-  document.getElementById("profile-handle").textContent = handle;
-  document.getElementById("profile-id").textContent = `ID: ${user.id ?? "-"}`;
+  const nameNode = document.getElementById("profile-name");
+  const handleNode = document.getElementById("profile-handle");
+  const idNode = document.getElementById("profile-id");
+
+  nameNode.textContent = fullName;
+  handleNode.textContent = handle;
+  handleNode.classList.toggle("hidden", !handle);
+
+  if (compactId) {
+    idNode.textContent = `ID ${compactId}`;
+    idNode.classList.remove("hidden");
+  } else {
+    idNode.textContent = "";
+    idNode.classList.add("hidden");
+  }
 
   setAvatar(document.getElementById("profile-avatar"), user);
   setAvatar(document.getElementById("nav-avatar"), user);
@@ -756,3 +789,4 @@ async function bootstrap() {
 }
 
 bootstrap();
+
