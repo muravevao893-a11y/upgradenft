@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-59";
+const APP_VERSION = "2026-02-22-60";
 
 const tabMeta = {
   tasks: {
@@ -49,6 +49,8 @@ const fallbackUser = {
 
 const TONAPI_BASE = String(window.__UPNFT_TONAPI_BASE__ || "https://tonapi.io/v2").replace(/\/$/, "");
 const TONCENTER_BASE = String(window.__UPNFT_TONCENTER_BASE__ || "https://toncenter.com/api/v2").replace(/\/$/, "");
+const TONAPI_TESTNET_BASE = String(window.__UPNFT_TONAPI_TESTNET_BASE__ || "https://testnet.tonapi.io/v2").replace(/\/$/, "");
+const TONCENTER_TESTNET_BASE = String(window.__UPNFT_TONCENTER_TESTNET_BASE__ || "https://testnet.toncenter.com/api/v2").replace(/\/$/, "");
 const TELEGRAM_GIFTS_ENDPOINT = String(window.__UPNFT_GIFTS_ENDPOINT__ || "").trim();
 const UPGRADE_API_BASE = String(window.__UPNFT_UPGRADE_API_BASE__ || "").trim().replace(/\/$/, "");
 const BANK_WALLET_ADDRESS = String(
@@ -99,6 +101,8 @@ const UPGRADE_MAX_TARGET_OFFSET = clamp(
   0,
   1000000,
 );
+const TON_CHAIN_MAINNET = "-239";
+const TON_CHAIN_TESTNET = "-3";
 
 const DEFAULT_LOCALE = "ru";
 
@@ -575,6 +579,7 @@ const state = {
   setTab: null,
   tonConnectUI: null,
   tonAddress: "",
+  tonChain: "",
   refreshWalletData: null,
   refreshTelegramGifts: null,
   openWalletModal: null,
@@ -2133,6 +2138,23 @@ function formatTonFromNano(nanoValue) {
   }
 }
 
+function normalizeTonChainId(chainValue) {
+  const raw = String(chainValue ?? "").trim();
+  return raw || "";
+}
+
+function isTonTestnetChain(chainValue) {
+  return normalizeTonChainId(chainValue) === TON_CHAIN_TESTNET;
+}
+
+function resolveTonApiBase(chainValue) {
+  return isTonTestnetChain(chainValue) ? TONAPI_TESTNET_BASE : TONAPI_BASE;
+}
+
+function resolveTonCenterBase(chainValue) {
+  return isTonTestnetChain(chainValue) ? TONCENTER_TESTNET_BASE : TONCENTER_BASE;
+}
+
 async function fetchJsonWithTimeout(url, timeoutMs = 9000, requestInit = null) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -2159,19 +2181,21 @@ async function fetchJsonWithTimeout(url, timeoutMs = 9000, requestInit = null) {
   }
 }
 
-async function fetchWalletTonBalance(address) {
+async function fetchWalletTonBalance(address, chain = "") {
   const normalized = String(address || "").trim();
   if (!normalized) return null;
   const encoded = encodeURIComponent(normalized);
+  const tonApiBase = resolveTonApiBase(chain);
+  const tonCenterBase = resolveTonCenterBase(chain);
 
-  const tonApiData = await fetchJsonWithTimeout(`${TONAPI_BASE}/accounts/${encoded}`);
+  const tonApiData = await fetchJsonWithTimeout(`${tonApiBase}/accounts/${encoded}`);
   const tonApiBalance = tonApiData?.balance;
   if (tonApiBalance !== undefined && tonApiBalance !== null) {
     const parsed = formatTonFromNano(tonApiBalance);
     if (parsed !== null) return parsed;
   }
 
-  const tonCenterData = await fetchJsonWithTimeout(`${TONCENTER_BASE}/getAddressInformation?address=${encoded}`);
+  const tonCenterData = await fetchJsonWithTimeout(`${tonCenterBase}/getAddressInformation?address=${encoded}`);
   const tonCenterBalance = tonCenterData?.result?.balance;
   if (tonCenterData?.ok && tonCenterBalance !== undefined && tonCenterBalance !== null) {
     const parsed = formatTonFromNano(tonCenterBalance);
@@ -4238,21 +4262,21 @@ function setupTonConnect() {
 
   state.refreshWalletLocale = refreshWalletLocale;
 
-  const loadWalletBalance = async (address) => {
+  const loadWalletBalance = async (address, chain = state.tonChain) => {
     const token = ++balanceRequestToken;
     state.walletUi.balanceLoading = true;
     walletBubbleBalance.textContent = t("wallet_balance_loading");
-    const balance = await fetchWalletTonBalance(address);
+    const balance = await fetchWalletTonBalance(address, chain);
     if (token !== balanceRequestToken) return;
     state.walletUi.balanceLoading = false;
-    walletBubbleBalance.textContent = balance ? `${balance} TON` : "-- TON";
+    walletBubbleBalance.textContent = balance !== null ? `${balance} TON` : "-- TON";
   };
 
-  const startBalancePolling = (address) => {
+  const startBalancePolling = (address, chain = state.tonChain) => {
     stopBalancePolling();
-    void loadWalletBalance(address);
+    void loadWalletBalance(address, chain);
     balanceRefreshTimer = window.setInterval(() => {
-      void loadWalletBalance(address);
+      void loadWalletBalance(address, chain);
     }, 30000);
   };
 
@@ -4373,11 +4397,13 @@ function setupTonConnect() {
 
   state.refreshWalletData = async () => {
     if (!state.tonAddress) return;
+    await loadWalletBalance(state.tonAddress, state.tonChain);
     await loadWalletNfts(state.tonAddress);
   };
 
   const paintConnectionState = (wallet) => {
     const address = wallet?.account?.address || state.tonConnectUI?.account?.address || "";
+    const chain = normalizeTonChainId(wallet?.account?.chain || state.tonConnectUI?.wallet?.account?.chain || "");
     const connected = Boolean(address);
 
     setWalletButtonKey("wallet_connect");
@@ -4388,15 +4414,17 @@ function setupTonConnect() {
     if (connected) {
       const isNewConnection = state.tonAddress !== address;
       state.tonAddress = address;
+      state.tonChain = chain;
       if (isNewConnection) {
         recordAnalytics("walletConnects");
       }
 
       setWalletShort("wallet_syncing_nft");
-      startBalancePolling(address);
+      startBalancePolling(address, chain);
       startNftPolling(address);
     } else {
       state.tonAddress = "";
+      state.tonChain = "";
       stopBalancePolling();
       stopNftPolling();
       state.walletUi.balanceLoading = false;
@@ -4416,6 +4444,14 @@ function setupTonConnect() {
     (wallet) => paintConnectionState(wallet),
     (error) => console.error("TonConnect status error:", error),
   );
+
+  const refreshOnVisibility = () => {
+    if (!state.tonAddress || document.hidden) return;
+    void loadWalletBalance(state.tonAddress, state.tonChain);
+    void loadWalletNfts(state.tonAddress);
+  };
+  document.addEventListener("visibilitychange", refreshOnVisibility);
+  window.addEventListener("focus", refreshOnVisibility);
 
   connectButton.addEventListener("click", async () => {
     try {

@@ -967,14 +967,13 @@ svg {
 
 .math-note {
   width: 100%;
-  min-height: 18px;
+  min-height: 28px;
   color: var(--text-3);
   font-size: 12px;
   line-height: 1.3;
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
   padding: 0 2px;
 }
 
@@ -2366,6 +2365,67 @@ video.nft-media {
     calc(var(--runtime-nav-height) + env(safe-area-inset-bottom) + 16px);
 }
 
+.app-shell[data-device="mobile"] {
+  --app-width: 100%;
+  padding:
+    calc(env(safe-area-inset-top) + 8px)
+    10px
+    calc(var(--runtime-nav-height) + env(safe-area-inset-bottom) + 10px);
+}
+
+.app-shell[data-device="mobile"] .screen {
+  gap: 10px;
+  padding: 0;
+}
+
+.app-shell[data-device="mobile"] .list-controls {
+  grid-template-columns: 1fr;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.app-shell[data-device="mobile"] .control-input,
+.app-shell[data-device="mobile"] .control-select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.app-shell[data-device="mobile"] .chance-ring {
+  width: clamp(164px, 47vw, 208px);
+}
+
+.app-shell[data-device="mobile"] .chance-core strong {
+  font-size: clamp(36px, 10vw, 48px);
+}
+
+.app-shell[data-device="mobile"] .block-title {
+  font-size: clamp(20px, 7vw, 28px);
+  margin-top: 0;
+}
+
+.app-shell[data-device="mobile"] .primary-btn {
+  height: 44px;
+  font-size: 16px;
+}
+
+.app-shell[data-device="mobile"] .math-note {
+  min-height: 0;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.app-shell[data-device="mobile"] .profile-meta h2 {
+  font-size: clamp(18px, 6vw, 24px);
+}
+
+body[data-device="mobile"] .bottom-nav {
+  width: calc(100% - 12px);
+  max-width: calc(100% - 12px);
+  border-radius: 22px;
+  padding-inline: 8px;
+}
+
 .app-shell[data-device="desktop"].is-internal-screen {
   padding-bottom: calc(env(safe-area-inset-bottom) + 16px);
 }
@@ -2515,9 +2575,9 @@ body[data-device="desktop"] .bottom-nav.is-hidden {
   transform: translate(-50%, 130%);
 }
 
-@media (max-width: 979px) {
+@media (max-width: 1279px) {
   .app-shell[data-device="desktop"] {
-    --app-width: 560px;
+    --app-width: 760px;
   }
 
   .app-shell[data-device="desktop"] .sections-wrap {
