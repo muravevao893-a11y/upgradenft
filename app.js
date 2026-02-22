@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-39";
+const APP_VERSION = "2026-02-22-41";
 
 const tabMeta = {
   tasks: {
@@ -39,12 +39,22 @@ const fallbackUser = {
   photo_url: "",
 };
 
-const TONAPI_BASE = "https://tonapi.io/v2";
+const TONAPI_BASE = String(window.__UPNFT_TONAPI_BASE__ || "https://tonapi.io/v2").replace(/\/$/, "");
+const TONCENTER_BASE = String(window.__UPNFT_TONCENTER_BASE__ || "https://toncenter.com/api/v2").replace(/\/$/, "");
 const NFT_PAGE_LIMIT = 100;
 const NFT_MAX_PAGES = 4;
 const COLLECTION_SCAN_LIMIT = 60;
 const MAX_COLLECTIONS_FOR_MARKET = 6;
 const MAX_TARGETS = 60;
+const HISTORY_LIMIT = 60;
+const RENDER_CHUNK_SIZE = 16;
+const STALE_MS = 120000;
+
+const LOCAL_KEYS = {
+  history: "upnft_history_v1",
+  analytics: "upnft_analytics_v1",
+  fair: "upnft_fair_v1",
+};
 
 const state = {
   data: {
@@ -66,12 +76,48 @@ const state = {
   profileTab: "my",
   profileTabsBound: false,
   profileCopyBound: false,
+  upgradesUiBound: false,
   tonConnectUI: null,
+  tonAddress: "",
+  refreshWalletData: null,
+  openWalletModal: null,
   orbitAngle: 0,
   isSpinning: false,
   spinRafId: null,
   chanceRafId: null,
   displayedChance: 0,
+  ui: {
+    ownSearch: "",
+    ownSort: "value-desc",
+    targetSearch: "",
+    targetSort: "value-asc",
+  },
+  history: [],
+  analytics: {
+    launches: 0,
+    walletConnects: 0,
+    nftSyncSuccess: 0,
+    upgradeAttempts: 0,
+    upgradeWins: 0,
+    upgradeLosses: 0,
+    filtersUsed: 0,
+    lastUpdated: 0,
+  },
+  network: {
+    online: navigator.onLine !== false,
+    status: "idle",
+    detail: "",
+    pending: 0,
+    lastSuccessAt: 0,
+  },
+  fair: {
+    nonce: 0,
+    serverSeed: "",
+    commitment: "",
+    nextSeed: "",
+    nextCommitment: "",
+    ready: false,
+  },
 };
 
 function clamp(value, min, max) {
@@ -223,6 +269,507 @@ function setupProfileCopyActions() {
   state.profileCopyBound = true;
 }
 
+function nowMs() {
+  return Date.now();
+}
+
+function readLocalJson(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeLocalJson(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage quota/private mode errors.
+  }
+}
+
+function shortHash(value, prefix = 8, suffix = 8) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "-";
+  if (raw.length <= prefix + suffix + 3) return raw;
+  return `${raw.slice(0, prefix)}...${raw.slice(-suffix)}`;
+}
+
+function updateNetworkPill() {
+  const pill = document.getElementById("network-pill");
+  const text = document.getElementById("network-pill-text");
+  if (!pill || !text) return;
+
+  const { status, detail } = state.network;
+  const fallbackMap = {
+    idle: "Ожидание",
+    syncing: "Синхронизация",
+    ready: "Данные актуальны",
+    stale: "Данные устарели",
+    offline: "Нет сети",
+    error: "Ошибка сети",
+  };
+  const label = detail || fallbackMap[status] || "Статус сети";
+
+  pill.className = `network-pill${status ? ` is-${status}` : ""}`;
+  text.textContent = label;
+  pill.classList.remove("hidden");
+}
+
+function setNetworkStatus(status, detail = "") {
+  state.network.status = status;
+  state.network.detail = detail;
+  if (status === "ready") {
+    state.network.lastSuccessAt = nowMs();
+  }
+  updateNetworkPill();
+}
+
+function markNetworkRequestStart() {
+  state.network.pending += 1;
+  if (state.network.online) {
+    setNetworkStatus("syncing", "Синхронизация");
+  } else {
+    setNetworkStatus("offline", "Нет сети");
+  }
+}
+
+function markNetworkRequestEnd(ok) {
+  state.network.pending = Math.max(0, state.network.pending - 1);
+  if (state.network.pending > 0) return;
+
+  if (!state.network.online) {
+    setNetworkStatus("offline", "Нет сети");
+    return;
+  }
+
+  if (ok) {
+    setNetworkStatus("ready", "Данные актуальны");
+    return;
+  }
+
+  setNetworkStatus("error", "Ошибка сети");
+}
+
+function monitorNetworkFreshness() {
+  window.addEventListener("online", () => {
+    state.network.online = true;
+    setNetworkStatus("ready", "Сеть восстановлена");
+  });
+  window.addEventListener("offline", () => {
+    state.network.online = false;
+    setNetworkStatus("offline", "Нет сети");
+  });
+
+  window.setInterval(() => {
+    if (!state.network.lastSuccessAt || state.network.pending > 0 || !state.network.online) return;
+    if (nowMs() - state.network.lastSuccessAt > STALE_MS) {
+      setNetworkStatus("stale", "Данные устарели");
+    }
+  }, 15000);
+}
+
+function recordAnalytics(eventName) {
+  if (!eventName) return;
+  if (!(eventName in state.analytics)) return;
+  state.analytics[eventName] += 1;
+  state.analytics.lastUpdated = nowMs();
+  writeLocalJson(LOCAL_KEYS.analytics, state.analytics);
+}
+
+function renderAnalyticsRow() {
+  const node = document.getElementById("analytics-row");
+  if (!node) return;
+
+  const attempts = state.analytics.upgradeAttempts;
+  const wins = state.analytics.upgradeWins;
+  const conversion = attempts > 0 ? `${((wins / attempts) * 100).toFixed(1)}%` : "-";
+
+  node.innerHTML = "";
+
+  const cells = [
+    { label: "Запусков", value: String(state.analytics.launches) },
+    { label: "Круток", value: String(attempts) },
+    { label: "Конверсия", value: conversion },
+  ];
+
+  cells.forEach((cell) => {
+    const item = document.createElement("div");
+    const label = document.createElement("span");
+    label.textContent = cell.label;
+    const value = document.createElement("strong");
+    value.textContent = cell.value;
+    item.append(label, value);
+    node.append(item);
+  });
+}
+
+function loadPersistentData() {
+  const savedHistory = readLocalJson(LOCAL_KEYS.history, []);
+  state.history = safeArray(savedHistory).slice(0, HISTORY_LIMIT);
+
+  const savedAnalytics = readLocalJson(LOCAL_KEYS.analytics, null);
+  if (savedAnalytics && typeof savedAnalytics === "object") {
+    state.analytics = {
+      ...state.analytics,
+      ...savedAnalytics,
+    };
+  }
+
+  const savedFair = readLocalJson(LOCAL_KEYS.fair, null);
+  if (savedFair && typeof savedFair === "object") {
+    state.fair = {
+      ...state.fair,
+      ...savedFair,
+      ready: false,
+    };
+  }
+}
+
+async function sha256Hex(input) {
+  const text = String(input ?? "");
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function randomHex(bytes = 32) {
+  const safeBytes = Math.max(8, Math.min(128, Math.floor(toNumber(bytes, 32))));
+  const buffer = new Uint8Array(safeBytes);
+  crypto.getRandomValues(buffer);
+  return Array.from(buffer)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function prepareFairState() {
+  if (!state.fair.serverSeed) {
+    state.fair.serverSeed = randomHex(32);
+  }
+
+  if (!state.fair.nextSeed) {
+    state.fair.nextSeed = randomHex(32);
+  }
+
+  state.fair.commitment = await sha256Hex(state.fair.serverSeed);
+  state.fair.nextCommitment = await sha256Hex(state.fair.nextSeed);
+  state.fair.ready = true;
+  writeLocalJson(LOCAL_KEYS.fair, {
+    nonce: state.fair.nonce,
+    serverSeed: state.fair.serverSeed,
+    commitment: state.fair.commitment,
+    nextSeed: state.fair.nextSeed,
+    nextCommitment: state.fair.nextCommitment,
+  });
+}
+
+function renderFairCommitment() {
+  const hashNode = document.getElementById("fair-commitment");
+  if (!hashNode) return;
+  hashNode.textContent = shortHash(state.fair.commitment, 10, 10);
+  hashNode.title = state.fair.commitment || "";
+}
+
+async function rotateFairState() {
+  state.fair.serverSeed = state.fair.nextSeed || randomHex(32);
+  state.fair.nextSeed = randomHex(32);
+  state.fair.commitment = await sha256Hex(state.fair.serverSeed);
+  state.fair.nextCommitment = await sha256Hex(state.fair.nextSeed);
+  state.fair.ready = true;
+  writeLocalJson(LOCAL_KEYS.fair, {
+    nonce: state.fair.nonce,
+    serverSeed: state.fair.serverSeed,
+    commitment: state.fair.commitment,
+    nextSeed: state.fair.nextSeed,
+    nextCommitment: state.fair.nextCommitment,
+  });
+  renderFairCommitment();
+}
+
+async function getFairRoll(chancePercent) {
+  if (!state.fair.ready) {
+    await prepareFairState();
+  }
+
+  const nonce = state.fair.nonce + 1;
+  const clientSeedRaw = [
+    state.tonAddress || "no-wallet",
+    window.Telegram?.WebApp?.initDataUnsafe?.user?.id ?? "anon",
+    nowMs(),
+    randomHex(8),
+  ].join(":");
+  const clientSeed = await sha256Hex(clientSeedRaw);
+  const digest = await sha256Hex(`${state.fair.serverSeed}:${clientSeed}:${nonce}`);
+  const fraction = parseInt(digest.slice(0, 13), 16) / 0x20000000000000;
+  const targetAngle = normalizeAngle(fraction * 360);
+  const chanceDegrees = clamp(chancePercent, 0, 100) * 3.6;
+  const success = targetAngle <= chanceDegrees;
+
+  state.fair.nonce = nonce;
+  writeLocalJson(LOCAL_KEYS.fair, {
+    nonce: state.fair.nonce,
+    serverSeed: state.fair.serverSeed,
+    commitment: state.fair.commitment,
+    nextSeed: state.fair.nextSeed,
+    nextCommitment: state.fair.nextCommitment,
+  });
+
+  return {
+    nonce,
+    targetAngle,
+    success,
+    digest,
+    clientSeed,
+    serverSeed: state.fair.serverSeed,
+    commitment: state.fair.commitment,
+  };
+}
+
+function clearHistory() {
+  state.history = [];
+  writeLocalJson(LOCAL_KEYS.history, state.history);
+  renderUpgradeHistory();
+}
+
+function pushHistoryEntry(entry) {
+  state.history.unshift(entry);
+  state.history = state.history.slice(0, HISTORY_LIMIT);
+  writeLocalJson(LOCAL_KEYS.history, state.history);
+  renderUpgradeHistory();
+}
+
+function renderUpgradeHistory() {
+  const list = document.getElementById("upgrade-history");
+  const empty = document.getElementById("history-empty");
+  if (!list || !empty) return;
+
+  list.innerHTML = "";
+
+  state.history.forEach((item) => {
+    const row = document.createElement("article");
+    row.className = `history-item${item.success ? " is-success" : " is-fail"}`;
+
+    const top = document.createElement("div");
+    top.className = "history-top";
+    const title = document.createElement("strong");
+    title.textContent = `${item.sourceName} -> ${item.targetName}`;
+    const result = document.createElement("span");
+    result.textContent = item.success ? "WIN" : "LOSE";
+    top.append(title, result);
+
+    const meta = document.createElement("p");
+    meta.className = "history-meta";
+    meta.textContent = `${new Date(item.at).toLocaleTimeString()} • ${item.chance.toFixed(1)}% • n${item.nonce}`;
+
+    const fair = document.createElement("p");
+    fair.className = "history-fair";
+    fair.textContent = `hash ${shortHash(item.commitment, 8, 8)} • seed ${shortHash(item.serverSeed, 6, 6)}`;
+
+    row.append(top, meta, fair);
+    list.append(row);
+  });
+
+  hideElementById("history-empty", state.history.length > 0);
+}
+
+function tokenize(text) {
+  return String(text ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function sortNfts(list, mode) {
+  const items = [...list];
+  if (mode === "value-asc") {
+    items.sort((left, right) => left.value - right.value);
+    return items;
+  }
+  if (mode === "name-asc") {
+    items.sort((left, right) => String(left.name).localeCompare(String(right.name), "ru"));
+    return items;
+  }
+  if (mode === "name-desc") {
+    items.sort((left, right) => String(right.name).localeCompare(String(left.name), "ru"));
+    return items;
+  }
+  items.sort((left, right) => right.value - left.value);
+  return items;
+}
+
+function filterNfts(list, query) {
+  const q = tokenize(query);
+  if (!q) return list;
+  return list.filter((item) => {
+    const haystack = tokenize(`${item.name} ${item.tier} ${item.value}`);
+    return haystack.includes(q);
+  });
+}
+
+function appendInBatches(container, items, buildNode, chunkSize = RENDER_CHUNK_SIZE) {
+  const safeChunk = Math.max(6, chunkSize);
+  let index = 0;
+
+  const renderChunk = () => {
+    const fragment = document.createDocumentFragment();
+    const max = Math.min(index + safeChunk, items.length);
+    for (; index < max; index += 1) {
+      const item = items[index];
+      const node = buildNode(item, index);
+      if (node) fragment.append(node);
+    }
+    container.append(fragment);
+
+    if (index < items.length) {
+      requestAnimationFrame(renderChunk);
+    }
+  };
+
+  renderChunk();
+}
+
+function getFilteredTargets() {
+  const filtered = filterNfts(state.data.targets, state.ui.targetSearch);
+  return sortNfts(filtered, state.ui.targetSort);
+}
+
+function getFilteredOwnNfts() {
+  const filtered = filterNfts(state.data.inventory, state.ui.ownSearch);
+  return sortNfts(filtered, state.ui.ownSort);
+}
+
+function setupUpgradeUiControls() {
+  if (state.upgradesUiBound) return;
+
+  const targetSearch = document.getElementById("target-search");
+  const targetSort = document.getElementById("target-sort");
+  const ownSearch = document.getElementById("own-search");
+  const ownSort = document.getElementById("own-sort");
+  const historyClear = document.getElementById("history-clear-btn");
+  const copyFair = document.getElementById("copy-fair-btn");
+  const onboardingConnect = document.getElementById("onboarding-connect");
+  const onboardingRefresh = document.getElementById("onboarding-refresh");
+
+  if (targetSearch) {
+    targetSearch.value = state.ui.targetSearch;
+    targetSearch.addEventListener("input", (event) => {
+      state.ui.targetSearch = event.target.value;
+      recordAnalytics("filtersUsed");
+      renderTargetChips();
+      refreshUpgradeState();
+    });
+  }
+
+  if (targetSort) {
+    targetSort.value = state.ui.targetSort;
+    targetSort.addEventListener("change", (event) => {
+      state.ui.targetSort = event.target.value;
+      renderTargetChips();
+      refreshUpgradeState();
+    });
+  }
+
+  if (ownSearch) {
+    ownSearch.value = state.ui.ownSearch;
+    ownSearch.addEventListener("input", (event) => {
+      state.ui.ownSearch = event.target.value;
+      recordAnalytics("filtersUsed");
+      renderOwnNftCards();
+      refreshUpgradeState();
+    });
+  }
+
+  if (ownSort) {
+    ownSort.value = state.ui.ownSort;
+    ownSort.addEventListener("change", (event) => {
+      state.ui.ownSort = event.target.value;
+      renderOwnNftCards();
+      refreshUpgradeState();
+    });
+  }
+
+  if (historyClear) {
+    historyClear.addEventListener("click", clearHistory);
+  }
+
+  if (copyFair) {
+    copyFair.addEventListener("click", async () => {
+      const copied = await copyTextToClipboard(state.fair.commitment);
+      if (copied) showCopyFeedback(copyFair);
+    });
+  }
+
+  if (onboardingConnect) {
+    onboardingConnect.addEventListener("click", async () => {
+      if (typeof state.openWalletModal === "function") {
+        await state.openWalletModal();
+      }
+    });
+  }
+
+  if (onboardingRefresh) {
+    onboardingRefresh.addEventListener("click", async () => {
+      if (typeof state.refreshWalletData === "function") {
+        await state.refreshWalletData();
+      }
+    });
+  }
+
+  state.upgradesUiBound = true;
+}
+
+function renderOnboarding() {
+  const panel = document.getElementById("onboarding-panel");
+  const title = document.getElementById("onboarding-title");
+  const note = document.getElementById("onboarding-note");
+  const connectBtn = document.getElementById("onboarding-connect");
+  const refreshBtn = document.getElementById("onboarding-refresh");
+  if (!panel || !title || !note || !connectBtn || !refreshBtn) return;
+
+  let visible = false;
+  let titleText = "";
+  let noteText = "";
+  let showConnect = false;
+  let showRefresh = false;
+
+  const connected = Boolean(state.tonAddress);
+
+  if (!connected) {
+    visible = true;
+    titleText = "Старт";
+    noteText = "Подключи TON Wallet, чтобы загрузить NFT и рыночные цели.";
+    showConnect = true;
+  } else if (state.data.profileInventory.length === 0) {
+    visible = true;
+    titleText = "Кошелек подключен";
+    noteText = "NFT пока не найдены. Проверь кошелек и обнови загрузку.";
+    showRefresh = true;
+  } else if (state.data.inventory.length === 0) {
+    visible = true;
+    titleText = "Нужны рыночные цены";
+    noteText = "NFT есть, но для них пока нет TON-оценки. Попробуй обновить позже.";
+    showRefresh = true;
+  } else if (state.data.targets.length === 0) {
+    visible = true;
+    titleText = "Нет рыночных целей";
+    noteText = "Для выбранных коллекций не найдено доступных целей на рынке.";
+    showRefresh = true;
+  }
+
+  panel.classList.toggle("hidden", !visible);
+  title.textContent = titleText;
+  note.textContent = noteText;
+  connectBtn.classList.toggle("hidden", !showConnect);
+  refreshBtn.classList.toggle("hidden", !showRefresh);
+}
+
 function setOrbitAngle(angle) {
   state.orbitAngle = angle;
   const orbit = document.querySelector(".chance-orbit");
@@ -324,14 +871,21 @@ function formatTonFromNano(nanoValue) {
 async function fetchJsonWithTimeout(url, timeoutMs = 9000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  markNetworkRequestStart();
   try {
     const response = await fetch(url, {
       cache: "no-store",
       signal: controller.signal,
     });
-    if (!response.ok) return null;
-    return await response.json();
+    if (!response.ok) {
+      markNetworkRequestEnd(false);
+      return null;
+    }
+    const payload = await response.json();
+    markNetworkRequestEnd(true);
+    return payload;
   } catch {
+    markNetworkRequestEnd(false);
     return null;
   } finally {
     clearTimeout(timer);
@@ -343,14 +897,14 @@ async function fetchWalletTonBalance(address) {
   if (!normalized) return null;
   const encoded = encodeURIComponent(normalized);
 
-  const tonApiData = await fetchJsonWithTimeout(`https://tonapi.io/v2/accounts/${encoded}`);
+  const tonApiData = await fetchJsonWithTimeout(`${TONAPI_BASE}/accounts/${encoded}`);
   const tonApiBalance = tonApiData?.balance;
   if (tonApiBalance !== undefined && tonApiBalance !== null) {
     const parsed = formatTonFromNano(tonApiBalance);
     if (parsed !== null) return parsed;
   }
 
-  const tonCenterData = await fetchJsonWithTimeout(`https://toncenter.com/api/v2/getAddressInformation?address=${encoded}`);
+  const tonCenterData = await fetchJsonWithTimeout(`${TONCENTER_BASE}/getAddressInformation?address=${encoded}`);
   const tonCenterBalance = tonCenterData?.result?.balance;
   if (tonCenterData?.ok && tonCenterBalance !== undefined && tonCenterBalance !== null) {
     const parsed = formatTonFromNano(tonCenterBalance);
@@ -986,7 +1540,7 @@ function createNftCardBody(nft) {
 
   const status = document.createElement("span");
   status.className = `nft-status${nft.listed ? " is-listed" : ""}`;
-  status.textContent = nft.listed ? "LISTED" : "WALLET";
+  status.textContent = nft.listed ? "Маркет" : "Кошелек";
 
   meta.append(tier, status);
   body.append(title, meta);
@@ -1082,7 +1636,12 @@ function renderTargetChips() {
   const emptyNode = document.getElementById("target-empty");
   list.innerHTML = "";
 
-  state.data.targets.forEach((target) => {
+  const filteredTargets = getFilteredTargets();
+  if (!byId(filteredTargets, state.selectedTargetId)) {
+    state.selectedTargetId = filteredTargets[0]?.id ?? null;
+  }
+
+  appendInBatches(list, filteredTargets, (target) => {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = `target-chip${target.id === state.selectedTargetId ? " is-active" : ""}`;
@@ -1102,13 +1661,15 @@ function renderTargetChips() {
       refreshUpgradeState();
     });
 
-    list.append(chip);
+    return chip;
   });
 
   if (emptyNode) {
-    emptyNode.textContent = "Нет рыночных целей для апгрейда.";
+    emptyNode.textContent = state.data.targets.length > 0
+      ? "Нет результатов по фильтру."
+      : "Рыночные цели не найдены.";
   }
-  hideElementById("target-empty", state.data.targets.length > 0);
+  hideElementById("target-empty", filteredTargets.length > 0);
 }
 
 function renderOwnNftCards() {
@@ -1117,7 +1678,12 @@ function renderOwnNftCards() {
   const emptyNode = document.getElementById("own-empty");
   list.innerHTML = "";
 
-  state.data.inventory.forEach((nft) => {
+  const filteredOwn = getFilteredOwnNfts();
+  if (!byId(filteredOwn, state.selectedOwnId)) {
+    state.selectedOwnId = filteredOwn[0]?.id ?? null;
+  }
+
+  appendInBatches(list, filteredOwn, (nft) => {
     const card = createOwnNftCard(nft, nft.id === state.selectedOwnId);
     card.addEventListener("click", () => {
       if (state.isSpinning) return;
@@ -1125,18 +1691,20 @@ function renderOwnNftCards() {
       renderOwnNftCards();
       refreshUpgradeState();
     });
-    list.append(card);
+    return card;
   });
 
   if (emptyNode) {
     if (state.data.profileInventory.length > 0 && state.data.inventory.length === 0) {
-      emptyNode.textContent = "Нет NFT с рыночной ценой в TON.";
+      emptyNode.textContent = "Нет NFT с рыночной TON-ценой.";
+    } else if (state.data.inventory.length > 0 && filteredOwn.length === 0) {
+      emptyNode.textContent = "Нет результатов по фильтру.";
     } else {
       emptyNode.textContent = "NFT не загружены.";
     }
   }
 
-  hideElementById("own-empty", state.data.inventory.length > 0);
+  hideElementById("own-empty", filteredOwn.length > 0);
 }
 
 function calculateChance(source, target) {
@@ -1176,12 +1744,10 @@ function refreshUpgradeState() {
   button.disabled = state.isSpinning;
 }
 
-function spinArrowToResult(chancePercent) {
-  const chanceDegrees = clamp(chancePercent, 0, 100) * 3.6;
-  // One unbiased random landing angle defines the result; animation only visualizes it.
-  const targetAngle = randomUnit() * 360;
+function spinArrowToResult(targetAngle) {
   const currentNormalized = normalizeAngle(state.orbitAngle);
-  const deltaToTarget = (targetAngle - currentNormalized + 360) % 360;
+  const normalizedTarget = normalizeAngle(targetAngle);
+  const deltaToTarget = (normalizedTarget - currentNormalized + 360) % 360;
   const extraSpins = 6 + Math.floor(randomUnit() * 3);
   const totalDelta = (extraSpins * 360) + deltaToTarget;
   const startAngle = state.orbitAngle;
@@ -1208,8 +1774,7 @@ function spinArrowToResult(chancePercent) {
       state.spinRafId = null;
       const landed = normalizeAngle(startAngle + totalDelta);
       setOrbitAngle(landed);
-      const success = landed <= chanceDegrees;
-      resolve({ success, landed });
+      resolve({ landed });
     };
 
     state.spinRafId = requestAnimationFrame(step);
@@ -1233,11 +1798,11 @@ function applyUpgradeResult(success, source, target, landedAngle, chance, result
   }
 
   if (success) {
-    resultNode.textContent = "Успех";
+    resultNode.textContent = "Выигрыш";
     resultNode.classList.remove("fail");
     resultNode.classList.add("success");
   } else {
-    resultNode.textContent = "Неудача";
+    resultNode.textContent = "Проигрыш";
     resultNode.classList.remove("success");
     resultNode.classList.add("fail");
   }
@@ -1256,6 +1821,7 @@ function setupUpgradeFlow() {
 
     const chance = calculateChance(source, target);
     state.isSpinning = true;
+    recordAnalytics("upgradeAttempts");
 
     actionButton.disabled = true;
     actionButton.textContent = "Крутим...";
@@ -1263,8 +1829,36 @@ function setupUpgradeFlow() {
     result.textContent = "";
 
     try {
-      const spinResult = await spinArrowToResult(chance);
-      applyUpgradeResult(spinResult.success, source, target, spinResult.landed, chance, result);
+      const fairRoll = await getFairRoll(chance);
+      const spinResult = await spinArrowToResult(fairRoll.targetAngle);
+      applyUpgradeResult(fairRoll.success, source, target, spinResult.landed, chance, result);
+
+      pushHistoryEntry({
+        id: `h-${Date.now()}`,
+        at: nowMs(),
+        success: fairRoll.success,
+        chance,
+        landed: spinResult.landed,
+        sourceName: source.name,
+        targetName: target.name,
+        commitment: fairRoll.commitment,
+        serverSeed: fairRoll.serverSeed,
+        digest: fairRoll.digest,
+        nonce: fairRoll.nonce,
+      });
+
+      if (fairRoll.success) {
+        recordAnalytics("upgradeWins");
+      } else {
+        recordAnalytics("upgradeLosses");
+      }
+
+      await rotateFairState();
+    } catch (error) {
+      console.error("Upgrade flow error:", error);
+      result.classList.remove("success");
+      result.classList.add("fail");
+      result.textContent = "Ошибка апгрейда";
     } finally {
       state.isSpinning = false;
       actionButton.textContent = "Запустить апгрейд";
@@ -1294,6 +1888,7 @@ function refreshProfileStats() {
   document.getElementById("stat-nft-count").textContent = String(nftCount);
   document.getElementById("stat-upgrades").textContent = total > 0 ? String(total) : "-";
   document.getElementById("stat-winrate").textContent = winrate === null ? "-" : `${winrate.toFixed(1)}%`;
+  renderAnalyticsRow();
 }
 
 function applyProfileTab(tab) {
@@ -1329,9 +1924,13 @@ function renderAll() {
   renderTasks();
   renderCases();
   renderBonuses();
+  setupUpgradeUiControls();
   renderTargetChips();
   renderOwnNftCards();
   refreshUpgradeState();
+  renderFairCommitment();
+  renderUpgradeHistory();
+  renderOnboarding();
   renderProfileGrid("my-nft-grid", "my-empty", state.data.profileInventory);
   renderProfileGrid("dropped-nft-grid", "dropped-empty", state.data.dropped);
   refreshProfileStats();
@@ -1485,7 +2084,7 @@ function setupTonConnect() {
 
   const loadWalletBalance = async (address) => {
     const token = ++balanceRequestToken;
-    walletBubbleBalance.textContent = "Баланс...";
+    walletBubbleBalance.textContent = "Загрузка...";
     const balance = await fetchWalletTonBalance(address);
     if (token !== balanceRequestToken) return;
     walletBubbleBalance.textContent = balance ? `${balance} TON` : "-- TON";
@@ -1520,11 +2119,11 @@ function setupTonConnect() {
     const token = ++nftRequestToken;
     walletShort.textContent = "Синхронизация NFT...";
     const marketData = await fetchWalletMarketData(address);
-    if (token !== nftRequestToken) return;
+    if (token !== nftRequestToken) return null;
 
     if (!marketData) {
       walletShort.textContent = "Ошибка загрузки NFT";
-      return;
+      return null;
     }
 
     applyWalletMarketData(marketData);
@@ -1532,10 +2131,13 @@ function setupTonConnect() {
     if (marketData.profileInventory.length === 0) {
       walletShort.textContent = "В кошельке нет NFT";
     } else if (marketData.inventory.length === 0) {
-      walletShort.textContent = "NFT загружены, но нет TON-цен";
+      walletShort.textContent = "NFT загружены, цены TON не найдены";
     } else {
       walletShort.textContent = `NFT: ${marketData.profileInventory.length}`;
+      recordAnalytics("nftSyncSuccess");
     }
+
+    return marketData;
   };
 
   const startNftPolling = (address) => {
@@ -1547,7 +2149,7 @@ function setupTonConnect() {
   };
 
   if (!window.TON_CONNECT_UI?.TonConnectUI) {
-    walletShort.textContent = "TonConnect UI не загружен";
+    walletShort.textContent = "TonConnect недоступен";
     connectButton.disabled = true;
     setBubbleState(false);
     return;
@@ -1567,20 +2169,37 @@ function setupTonConnect() {
     return;
   }
 
+  state.openWalletModal = async () => {
+    if (!state.tonConnectUI) return;
+    await state.tonConnectUI.openModal();
+  };
+
+  state.refreshWalletData = async () => {
+    if (!state.tonAddress) return;
+    await loadWalletNfts(state.tonAddress);
+  };
+
   const paintConnectionState = (wallet) => {
     const address = wallet?.account?.address || state.tonConnectUI?.account?.address || "";
     const connected = Boolean(address);
 
-    setWalletButtonText("Connect Wallet");
+    setWalletButtonText("Подключить кошелек");
     connectButton.classList.toggle("hidden", connected);
     connectButton.disabled = false;
     setBubbleState(connected);
 
     if (connected) {
+      const isNewConnection = state.tonAddress !== address;
+      state.tonAddress = address;
+      if (isNewConnection) {
+        recordAnalytics("walletConnects");
+      }
+
       walletShort.textContent = "Синхронизация NFT...";
       startBalancePolling(address);
       startNftPolling(address);
     } else {
+      state.tonAddress = "";
       stopBalancePolling();
       stopNftPolling();
       walletBubbleBalance.textContent = "-- TON";
@@ -1600,7 +2219,7 @@ function setupTonConnect() {
 
   connectButton.addEventListener("click", async () => {
     try {
-      await state.tonConnectUI.openModal();
+      await state.openWalletModal();
     } catch (error) {
       console.error("TonConnect action error:", error);
       walletShort.textContent = "Не удалось подключить кошелек";
@@ -1609,6 +2228,11 @@ function setupTonConnect() {
 }
 
 async function bootstrap() {
+  loadPersistentData();
+  recordAnalytics("launches");
+  setNetworkStatus("idle", "Ожидание");
+  monitorNetworkFreshness();
+  await prepareFairState();
   setupTabs();
   setupTelegramUser();
   setupProfileCopyActions();
@@ -1619,6 +2243,7 @@ async function bootstrap() {
   renderAll();
   await loadAppData();
   renderAll();
+  setNetworkStatus(state.network.online ? "ready" : "offline", state.network.online ? "Готово" : "Нет сети");
   setupTonConnect();
 }
 

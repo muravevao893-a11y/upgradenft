@@ -12,11 +12,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=2026-02-22-39">
+  <link rel="stylesheet" href="./styles.css?v=2026-02-22-41">
 
   <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
   <script defer src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-  <script defer src="./app.js?v=2026-02-22-39"></script>
+  <script defer src="./app.js?v=2026-02-22-41"></script>
 </head>
 <body>
   <main id="app-shell" class="app-shell">
@@ -35,6 +35,10 @@
         <span id="wallet-bubble-balance" class="wallet-bubble-balance">-- TON</span>
       </span>
     </div>
+    <div id="network-pill" class="network-pill hidden" role="status" aria-live="polite">
+      <span class="network-dot" aria-hidden="true"></span>
+      <span id="network-pill-text">Ожидание</span>
+    </div>
 
     <div class="sections-wrap">
       <section class="tab-section" data-tab-section="tasks">
@@ -48,8 +52,30 @@
         <div class="screen upgrade-screen">
           <div class="target-block">
             <p class="label" aria-hidden="true"></p>
+            <div class="list-controls">
+              <input id="target-search" type="search" class="control-input" placeholder="Поиск цели">
+              <select id="target-sort" class="control-select">
+                <option value="value-asc">Цена: дешевые</option>
+                <option value="value-desc">Цена: дорогие</option>
+                <option value="name-asc">Имя: A-Z</option>
+                <option value="name-desc">Имя: Z-A</option>
+              </select>
+            </div>
             <div id="target-nft-list" class="target-chip-list"></div>
             <p id="target-empty" class="empty-note hidden">Цели недоступны.</p>
+          </div>
+          <section id="onboarding-panel" class="onboarding-panel hidden" aria-live="polite">
+            <h3 id="onboarding-title">Старт</h3>
+            <p id="onboarding-note">Подключи TON Wallet, чтобы загрузить NFT.</p>
+            <div class="onboarding-actions">
+              <button id="onboarding-connect" class="ghost-btn" type="button">Подключить</button>
+              <button id="onboarding-refresh" class="ghost-btn" type="button">Обновить NFT</button>
+            </div>
+          </section>
+          <div class="fair-box">
+            <span class="fair-label">Provably Fair</span>
+            <code id="fair-commitment">-</code>
+            <button id="copy-fair-btn" type="button">Копировать</button>
           </div>
 
           <div class="wheel-zone">
@@ -74,8 +100,25 @@
           <p id="upgrade-result" class="upgrade-result" aria-live="polite"></p>
 
           <h2 class="block-title">Мои NFT</h2>
+          <div class="list-controls">
+            <input id="own-search" type="search" class="control-input" placeholder="Поиск NFT">
+            <select id="own-sort" class="control-select">
+              <option value="value-desc">Цена: дорогие</option>
+              <option value="value-asc">Цена: дешевые</option>
+              <option value="name-asc">Имя: A-Z</option>
+              <option value="name-desc">Имя: Z-A</option>
+            </select>
+          </div>
           <div id="own-nft-list" class="nft-card-list"></div>
           <p id="own-empty" class="empty-note">NFT не загружены.</p>
+          <section class="history-block">
+            <div class="history-head">
+              <h3>История апгрейдов</h3>
+              <button id="history-clear-btn" type="button">Очистить</button>
+            </div>
+            <div id="upgrade-history" class="history-list"></div>
+            <p id="history-empty" class="empty-note">Пока нет круток.</p>
+          </section>
         </div>
       </section>
 
@@ -120,13 +163,14 @@
               <strong id="stat-winrate">-</strong>
             </div>
           </div>
+          <div id="analytics-row" class="analytics-row"></div>
 
           <button id="connect-wallet-btn" class="wallet-btn" type="button">
             <span class="wallet-btn-inner">
               <svg class="wallet-btn-icon" viewBox="0 0 56 56" aria-hidden="true" focusable="false">
                 <path d="M28 6.8h17.6c3.4 0 5.6 3.7 3.9 6.7L31.5 43.8c-1.6 2.8-5.6 2.8-7.2 0L6.5 13.5c-1.7-3 .5-6.7 3.9-6.7H28Zm0 7.4H14.3l13.7 23.3 13.7-23.3H28Z"/>
               </svg>
-              <span class="wallet-btn-text">Connect Wallet</span>
+              <span class="wallet-btn-text">Подключить кошелек</span>
             </span>
           </button>
           <p id="wallet-short" class="wallet-short">Кошелек не подключен</p>
