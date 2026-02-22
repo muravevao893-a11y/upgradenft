@@ -12,11 +12,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=2026-02-22-50">
+  <link rel="stylesheet" href="./styles.css?v=2026-02-22-58">
 
   <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
   <script defer src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-  <script defer src="./app.js?v=2026-02-22-50"></script>
+  <script defer src="./app.js?v=2026-02-22-58"></script>
 </head>
 <body>
   <main id="app-shell" class="app-shell">
@@ -25,7 +25,15 @@
       <h1 id="screen-title" aria-hidden="true"></h1>
       <p id="screen-subtitle" class="subtitle" aria-hidden="true"></p>
     </header>
-    <div id="wallet-bubble" class="wallet-bubble hidden" role="status" aria-live="polite">
+    <div
+      id="wallet-bubble"
+      class="wallet-bubble hidden"
+      role="button"
+      tabindex="0"
+      aria-haspopup="menu"
+      aria-expanded="false"
+      aria-label="Wallet actions"
+    >
       <span class="wallet-bubble-ton" aria-hidden="true">
         <svg viewBox="0 0 56 56" focusable="false">
           <path d="M28 6.8h17.6c3.4 0 5.6 3.7 3.9 6.7L31.5 43.8c-1.6 2.8-5.6 2.8-7.2 0L6.5 13.5c-1.7-3 .5-6.7 3.9-6.7H28Zm0 7.4H14.3l13.7 23.3 13.7-23.3H28Z"/>
@@ -34,6 +42,9 @@
       <span class="wallet-bubble-text">
         <span id="wallet-bubble-balance" class="wallet-bubble-balance">-- TON</span>
       </span>
+    </div>
+    <div id="wallet-menu" class="wallet-menu hidden" role="menu" aria-label="Wallet actions">
+      <button id="wallet-disconnect-btn" class="wallet-menu-btn" type="button" role="menuitem">Disconnect wallet</button>
     </div>
 
     <div class="sections-wrap">
@@ -122,8 +133,12 @@
           <div class="profile-top">
             <button id="open-settings-btn" class="profile-settings-btn" type="button" aria-label="Open settings">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M12 3.5a2 2 0 0 1 2 2v.3a5.9 5.9 0 0 1 1.7.7l.2-.2a2 2 0 1 1 2.8 2.8l-.2.2c.3.5.5 1.1.7 1.7h.3a2 2 0 1 1 0 4h-.3a5.9 5.9 0 0 1-.7 1.7l.2.2a2 2 0 1 1-2.8 2.8l-.2-.2c-.5.3-1.1.5-1.7.7v.3a2 2 0 1 1-4 0v-.3a5.9 5.9 0 0 1-1.7-.7l-.2.2a2 2 0 1 1-2.8-2.8l.2-.2a5.9 5.9 0 0 1-.7-1.7h-.3a2 2 0 1 1 0-4h.3c.1-.6.4-1.2.7-1.7l-.2-.2a2 2 0 1 1 2.8-2.8l.2.2c.5-.3 1.1-.5 1.7-.7v-.3a2 2 0 0 1 2-2Z" />
-                <circle cx="12" cy="12" r="2.7" />
+                <path d="M4.5 6h15" />
+                <path d="M4.5 12h15" />
+                <path d="M4.5 18h15" />
+                <circle cx="9" cy="6" r="2" />
+                <circle cx="15" cy="12" r="2" />
+                <circle cx="11" cy="18" r="2" />
               </svg>
             </button>
             <div id="profile-avatar" class="profile-avatar">U</div>
@@ -179,7 +194,8 @@
           <div class="settings-top">
             <button id="settings-back-btn" class="settings-back-btn" type="button" aria-label="Back to profile">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="m15 5-7 7 7 7" />
+                <path d="M15.5 4.5 8 12l7.5 7.5" />
+                <path d="M9 12h11" />
               </svg>
             </button>
             <h2 id="settings-page-title">Settings</h2>
@@ -190,7 +206,12 @@
               <span class="settings-item-left">
                 <span class="settings-item-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24" focusable="false">
-                    <path d="M4 7h16M8 3v4M16 3v4M9 17h6M12 13v8" />
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M3.8 12h16.4" />
+                    <path d="M12 3a14.5 14.5 0 0 1 0 18" />
+                    <path d="M12 3a14.5 14.5 0 0 0 0 18" />
+                    <path d="M5.3 8.2h13.4" />
+                    <path d="M5.3 15.8h13.4" />
                   </svg>
                 </span>
                 <span id="settings-language-title" class="settings-item-title">Language</span>
@@ -206,7 +227,8 @@
           <div class="language-top">
             <button id="language-back-btn" class="language-back-btn" type="button" aria-label="Back to profile">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="m15 5-7 7 7 7" />
+                <path d="M15.5 4.5 8 12l7.5 7.5" />
+                <path d="M9 12h11" />
               </svg>
             </button>
             <h2 id="language-page-title">Languages</h2>
@@ -214,8 +236,8 @@
 
           <label class="locale-search-wrap language-search-wrap" for="language-page-search">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m16.5 16.5 4 4" />
+              <circle cx="10.5" cy="10.5" r="6.5" />
+              <path d="M15.5 15.5 20 20" />
             </svg>
             <input id="language-page-search" class="locale-search" type="search" placeholder="Search language or country">
           </label>
@@ -230,37 +252,43 @@
   <nav class="bottom-nav" aria-label="РќР°РІРёРіР°С†РёСЏ">
     <button class="nav-btn" data-tab="tasks" type="button" aria-label="Р—Р°РґР°РЅРёСЏ">
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M10 6h10M10 12h10M10 18h10" />
-        <path d="m4 6 1.6 1.6L8 5.2" />
-        <path d="m4 12 1.6 1.6L8 11.2" />
-        <path d="m4 18 1.6 1.6L8 17.2" />
+        <rect x="4" y="3.5" width="16" height="17" rx="2.5" />
+        <path d="M9.8 8h6.7" />
+        <path d="M9.8 12h6.7" />
+        <path d="M9.8 16h6.7" />
+        <path d="m6.6 8 1.1 1.1L9.2 7.6" />
+        <path d="m6.6 12 1.1 1.1 1.5-1.5" />
+        <path d="m6.6 16 1.1 1.1 1.5-1.5" />
       </svg>
       <span>Р—Р°РґР°РЅРёСЏ</span>
     </button>
 
     <button class="nav-btn is-active" data-tab="upgrades" type="button" aria-label="РђРїРіСЂРµР№РґС‹">
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M4 16l6-6 4 4 6-6" />
-        <path d="M16 8h4v4" />
+        <path d="M4 16.5 9.2 11l3.4 3.4L20 7" />
+        <path d="M15.7 7H20v4.3" />
+        <path d="M4 20.5h16" />
       </svg>
       <span>РђРїРіСЂРµР№РґС‹</span>
     </button>
 
     <button class="nav-btn" data-tab="cases" type="button" aria-label="РљРµР№СЃС‹">
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M4 9h16a1 1 0 0 1 1 1v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a1 1 0 0 1 1-1Z" />
-        <path d="M9 9V7a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-        <path d="M3 13h18" />
+        <path d="M3.5 9.5h17a1 1 0 0 1 1 1V18a2.2 2.2 0 0 1-2.2 2.2H4.7A2.2 2.2 0 0 1 2.5 18v-7.5a1 1 0 0 1 1-1Z" />
+        <path d="M8.8 9.5V7.8A1.8 1.8 0 0 1 10.6 6h2.8a1.8 1.8 0 0 1 1.8 1.8v1.7" />
+        <path d="M2.5 13.2h19" />
+        <path d="M11 13.2v2.4h2v-2.4" />
       </svg>
       <span>РљРµР№СЃС‹</span>
     </button>
 
     <button class="nav-btn" data-tab="bonuses" type="button" aria-label="Р‘РѕРЅСѓСЃС‹">
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3 8h18v4H3z" />
-        <path d="M5 12h14v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z" />
-        <path d="M12 8v14" />
-        <path d="M12 8H9a2 2 0 1 1 0-4c2 0 3 4 3 4Zm0 0h3a2 2 0 1 0 0-4c-2 0-3 4-3 4Z" />
+        <rect x="3.5" y="9" width="17" height="3.4" rx="0.8" />
+        <path d="M5.2 12.4h13.6V19a2 2 0 0 1-2 2H7.2a2 2 0 0 1-2-2v-6.6Z" />
+        <path d="M12 9v12" />
+        <path d="M12 9H9.4A2 2 0 1 1 9.4 5c1.8 0 2.6 1.8 2.6 4Z" />
+        <path d="M12 9h2.6a2 2 0 1 0 0-4C12.8 5 12 6.8 12 9Z" />
       </svg>
       <span>Р‘РѕРЅСѓСЃС‹</span>
     </button>

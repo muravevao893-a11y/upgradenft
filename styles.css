@@ -32,6 +32,7 @@
 
   --app-width: 500px;
   --nav-height: 88px;
+  --runtime-nav-height: var(--nav-height);
 }
 
 * {
@@ -100,7 +101,7 @@ h2 {
   padding:
     calc(env(safe-area-inset-top) + 10px)
     12px
-    calc(var(--nav-height) + env(safe-area-inset-bottom) + 12px);
+    calc(var(--runtime-nav-height) + env(safe-area-inset-bottom) + 12px);
   position: relative;
 }
 
@@ -131,9 +132,58 @@ h2 {
   gap: 6px;
   color: var(--text-1);
   z-index: 25;
-  cursor: default;
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: auto;
   transition: border-color 0.2s ease, box-shadow 0.3s ease, opacity 0.25s ease;
+}
+
+.wallet-bubble:focus-visible {
+  outline: none;
+  border-color: rgba(184, 222, 255, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 0 0 1px rgba(112, 175, 238, 0.42),
+    0 10px 22px rgba(3, 9, 16, 0.5);
+}
+
+.wallet-menu {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 46px);
+  right: 12px;
+  min-width: 168px;
+  border: 1px solid rgba(154, 197, 239, 0.38);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(20, 33, 49, 0.76), rgba(13, 22, 35, 0.78));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 14px 30px rgba(1, 6, 12, 0.5);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 6px;
+  z-index: 26;
+}
+
+.wallet-menu-btn {
+  width: 100%;
+  height: 34px;
+  border: 1px solid rgba(163, 204, 245, 0.3);
+  border-radius: 9px;
+  background: rgba(10, 18, 30, 0.62);
+  color: #eaf3ff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.wallet-menu-btn:hover,
+.wallet-menu-btn:focus-visible {
+  outline: none;
+  border-color: rgba(183, 221, 255, 0.62);
+  background: rgba(22, 37, 56, 0.74);
 }
 
 .wallet-bubble-ton {
@@ -231,11 +281,11 @@ h2 {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  padding-top: 4px;
+  padding-top: var(--sections-top-pad, 4px);
 }
 
 .app-shell.has-wallet .sections-wrap {
-  padding-top: 48px;
+  padding-top: var(--sections-top-pad, 4px);
 }
 
 .tab-section {
@@ -940,14 +990,26 @@ svg {
 
 .upgrade-result {
   display: none;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-2);
+  text-align: center;
+  letter-spacing: -0.01em;
 }
 
 .upgrade-result.success {
+  display: block;
   color: var(--success);
 }
 
 .upgrade-result.fail {
+  display: block;
   color: var(--danger);
+}
+
+.upgrade-result.queued {
+  display: block;
+  color: var(--text-2);
 }
 
 .block-title {
@@ -1119,6 +1181,14 @@ svg {
   box-shadow:
     inset 0 0 0 1px rgba(172, 219, 255, 0.24),
     0 18px 30px rgba(2, 9, 17, 0.46);
+}
+
+.nft-card.is-readonly {
+  cursor: default;
+}
+
+.nft-card.is-readonly:hover {
+  transform: none;
 }
 
 .nft-thumb {
@@ -1343,13 +1413,15 @@ video.nft-media {
 }
 
 .profile-settings-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 19px;
+  height: 19px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.9;
+  stroke-width: 2.1;
   stroke-linecap: round;
   stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
+  vector-effect: non-scaling-stroke;
 }
 
 .settings-screen {
@@ -1385,13 +1457,15 @@ video.nft-media {
 }
 
 .settings-back-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 19px;
+  height: 19px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.3;
+  stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
+  vector-effect: non-scaling-stroke;
 }
 
 .settings-list {
@@ -1446,9 +1520,11 @@ video.nft-media {
   height: 18px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.85;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
+  vector-effect: non-scaling-stroke;
 }
 
 .settings-item-title {
@@ -1565,13 +1641,15 @@ video.nft-media {
 }
 
 .language-back-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 19px;
+  height: 19px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.3;
+  stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
+  vector-effect: non-scaling-stroke;
 }
 
 .language-search-wrap {
@@ -1636,10 +1714,12 @@ video.nft-media {
   height: 14px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.2;
+  stroke-width: 2.25;
   stroke-linecap: round;
   stroke-linejoin: round;
   opacity: 0.8;
+  shape-rendering: geometricPrecision;
+  vector-effect: non-scaling-stroke;
 }
 
 .locale-current-flag,
@@ -1691,9 +1771,11 @@ video.nft-media {
   height: 14px;
   fill: none;
   stroke: #8f9ab0;
-  stroke-width: 2;
+  stroke-width: 2.15;
   stroke-linecap: round;
   stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
+  vector-effect: non-scaling-stroke;
 }
 
 .locale-search {
@@ -2125,26 +2207,73 @@ video.nft-media {
 }
 
 .bottom-nav {
+  --nav-glow-x: 50%;
+  --nav-glow-w: 34px;
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 50%;
+  right: auto;
+  bottom: max(8px, calc(env(safe-area-inset-bottom) + 6px));
+  width: min(calc(var(--app-width) - 20px), calc(100vw - 14px));
   height: var(--nav-height);
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: center;
-  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(126, 171, 217, 0.24);
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  border: 1px solid rgba(146, 190, 236, 0.32);
+  border-radius: 24px;
   background:
-    linear-gradient(180deg, rgba(14, 26, 40, 0.86) 0%, rgba(10, 18, 30, 0.92) 100%);
-  backdrop-filter: blur(20px);
+    linear-gradient(180deg, rgba(14, 25, 39, 0.62) 0%, rgba(8, 16, 28, 0.54) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 14px 32px rgba(3, 8, 16, 0.52);
+  backdrop-filter: blur(24px) saturate(1.08);
+  -webkit-backdrop-filter: blur(24px) saturate(1.08);
   z-index: 20;
-  transition: transform 0.24s ease, opacity 0.2s ease;
+  overflow: hidden;
+  isolation: isolate;
+  transform: translateX(-50%);
+  transition: transform 0.38s cubic-bezier(0.22, 0.81, 0.31, 1), opacity 0.26s ease, box-shadow 0.3s ease;
+}
+
+.bottom-nav::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 0;
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(194, 222, 255, 0.52), rgba(255, 255, 255, 0));
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bottom-nav::after {
+  content: "";
+  position: absolute;
+  left: var(--nav-glow-x);
+  top: 6px;
+  width: var(--nav-glow-w);
+  height: 3px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, rgba(128, 198, 255, 0), rgba(191, 233, 255, 0.95), rgba(109, 180, 241, 0.92), rgba(128, 198, 255, 0));
+  box-shadow:
+    0 0 14px rgba(126, 194, 255, 0.55),
+    0 0 28px rgba(92, 165, 231, 0.38);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+  transition: left 0.42s cubic-bezier(0.2, 0.85, 0.25, 1), width 0.42s cubic-bezier(0.2, 0.85, 0.25, 1), opacity 0.24s ease;
+}
+
+.bottom-nav.is-ready::after {
+  opacity: 0.92;
 }
 
 .bottom-nav.is-hidden {
   opacity: 0;
-  transform: translateY(120%);
+  transform: translate(-50%, 130%);
   pointer-events: none;
 }
 
@@ -2163,17 +2292,20 @@ video.nft-media {
   justify-content: center;
   gap: 6px;
   cursor: pointer;
-  transition: color 0.2s ease;
+  transition: color 0.28s ease, transform 0.28s ease;
+  z-index: 1;
 }
 
 .nav-btn svg {
-  width: 21px;
-  height: 21px;
+  width: 22px;
+  height: 22px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.2;
+  stroke-width: 2.15;
   stroke-linecap: round;
   stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
+  vector-effect: non-scaling-stroke;
 }
 
 .nav-btn span {
@@ -2182,18 +2314,12 @@ video.nft-media {
 }
 
 .nav-btn.is-active {
-  color: #dff1ff;
+  color: #ecf7ff;
+  transform: translateY(-1px);
 }
 
 .nav-btn.is-active::before {
-  content: "";
-  position: absolute;
-  top: -7px;
-  width: 30px;
-  height: 2px;
-  border-radius: 999px;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(133, 200, 255, 0.82), rgba(97, 169, 238, 0.55), rgba(255, 255, 255, 0));
+  content: none;
 }
 
 .nav-btn.profile-nav {
@@ -2205,7 +2331,7 @@ video.nft-media {
   padding:
     calc(env(safe-area-inset-top) + 14px)
     18px
-    calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px);
+    calc(var(--runtime-nav-height) + env(safe-area-inset-bottom) + 16px);
 }
 
 .app-shell[data-device="desktop"].is-internal-screen {
@@ -2213,16 +2339,21 @@ video.nft-media {
 }
 
 .app-shell[data-device="desktop"] .sections-wrap {
-  padding-top: 40px;
+  padding-top: var(--sections-top-pad, 8px);
 }
 
 .app-shell[data-device="desktop"].has-wallet .sections-wrap {
-  padding-top: 66px;
+  padding-top: var(--sections-top-pad, 8px);
 }
 
 .app-shell[data-device="desktop"] .wallet-bubble {
   right: 18px;
   top: calc(env(safe-area-inset-top) + 14px);
+}
+
+.app-shell[data-device="desktop"] .wallet-menu {
+  right: 18px;
+  top: calc(env(safe-area-inset-top) + 50px);
 }
 
 .app-shell[data-device="desktop"] .network-pill {
@@ -2340,14 +2471,26 @@ body[data-device="desktop"] .bottom-nav {
   left: 50%;
   right: auto;
   transform: translateX(-50%);
-  border: 1px solid rgba(134, 180, 227, 0.3);
-  border-radius: 18px;
-  bottom: 8px;
+  border: 1px solid rgba(146, 190, 236, 0.32);
+  border-radius: 24px;
+  bottom: max(8px, calc(env(safe-area-inset-bottom) + 6px));
+}
+
+body[data-device="desktop"] .bottom-nav.is-hidden {
+  transform: translate(-50%, 130%);
 }
 
 @media (max-width: 979px) {
   .app-shell[data-device="desktop"] {
     --app-width: 560px;
+  }
+
+  .app-shell[data-device="desktop"] .sections-wrap {
+    padding-top: var(--sections-top-pad, 8px);
+  }
+
+  .app-shell[data-device="desktop"].has-wallet .sections-wrap {
+    padding-top: var(--sections-top-pad, 8px);
   }
 
   .app-shell[data-device="desktop"] .simple-list {
@@ -2360,15 +2503,38 @@ body[data-device="desktop"] .bottom-nav {
 
   .app-shell[data-device="desktop"] .upgrade-screen {
     overflow: auto;
+    text-align: center;
   }
 
   .app-shell[data-device="desktop"] .upgrade-layout {
     grid-template-columns: 1fr;
+    height: auto;
+    gap: 12px;
   }
 
   .app-shell[data-device="desktop"] .upgrade-main-col,
   .app-shell[data-device="desktop"] .upgrade-side-col {
-    padding: 10px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .app-shell[data-device="desktop"] .block-title {
+    text-align: center;
+    font-size: clamp(24px, 6vw, 30px);
+  }
+
+  .app-shell[data-device="desktop"] .chance-ring {
+    width: clamp(188px, 56vw, 236px);
+  }
+
+  .app-shell[data-device="desktop"] .nft-card-list {
+    flex: 0 0 auto;
+    min-height: auto;
+    overflow: visible;
   }
 
   .app-shell[data-device="desktop"] .nft-card-list {
@@ -2388,6 +2554,11 @@ body[data-device="desktop"] .bottom-nav {
   .wallet-bubble {
     right: 10px;
     min-width: 84px;
+  }
+
+  .wallet-menu {
+    right: 10px;
+    min-width: 156px;
   }
 
   .network-pill {
@@ -2519,13 +2690,7 @@ body[data-device="desktop"] .bottom-nav {
 
 @media (min-width: 520px) {
   .bottom-nav {
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
     width: min(calc(var(--app-width) - 20px), calc(100vw - 14px));
-    border: 1px solid rgba(134, 180, 227, 0.3);
-    border-radius: 18px;
-    bottom: 8px;
   }
 }
 

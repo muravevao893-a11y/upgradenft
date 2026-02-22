@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-50";
+const APP_VERSION = "2026-02-22-58";
 
 const tabMeta = {
   tasks: {
@@ -49,6 +49,13 @@ const fallbackUser = {
 
 const TONAPI_BASE = String(window.__UPNFT_TONAPI_BASE__ || "https://tonapi.io/v2").replace(/\/$/, "");
 const TONCENTER_BASE = String(window.__UPNFT_TONCENTER_BASE__ || "https://toncenter.com/api/v2").replace(/\/$/, "");
+const TELEGRAM_GIFTS_ENDPOINT = String(window.__UPNFT_GIFTS_ENDPOINT__ || "").trim();
+const UPGRADE_API_BASE = String(window.__UPNFT_UPGRADE_API_BASE__ || "").trim().replace(/\/$/, "");
+const BANK_WALLET_ADDRESS = String(
+  window.__UPNFT_BANK_WALLET__
+  || "UQCgQQSGPlFWr5TY8UVT7XvtkVtNkRPIGUEnFOB4gRZbQEu4",
+).trim();
+const SECURE_UPGRADE_REQUIRED = window.__UPNFT_SECURE_UPGRADE_REQUIRED__ !== false;
 const NFT_PAGE_LIMIT = 100;
 const NFT_MAX_PAGES = 4;
 const COLLECTION_SCAN_LIMIT = 60;
@@ -57,6 +64,41 @@ const MAX_TARGETS = 60;
 const HISTORY_LIMIT = 60;
 const RENDER_CHUNK_SIZE = 16;
 const STALE_MS = 120000;
+const UPGRADE_COOLDOWN_MS = clamp(
+  Math.floor(toNumber(window.__UPNFT_UPGRADE_COOLDOWN_MS__, 4500)),
+  500,
+  60000,
+);
+const UPGRADE_QUEUE_MAX_WAIT_MS = clamp(
+  Math.floor(toNumber(window.__UPNFT_UPGRADE_QUEUE_MAX_WAIT_MS__, 60000)),
+  5000,
+  60000,
+);
+const UPGRADE_QUEUE_POLL_MS = clamp(
+  Math.floor(toNumber(window.__UPNFT_UPGRADE_QUEUE_POLL_MS__, 1200)),
+  450,
+  5000,
+);
+const UPGRADE_OFFER_TTL_MS = clamp(
+  Math.floor(toNumber(window.__UPNFT_OFFER_TTL_MS__, 60000)),
+  10000,
+  60000,
+);
+const UPGRADE_DECLINE_PENALTY_MS = clamp(
+  Math.floor(toNumber(window.__UPNFT_UPGRADE_DECLINE_PENALTY_MS__, 60000)),
+  5000,
+  300000,
+);
+const UPGRADE_MAX_TARGET_MULTIPLIER = clamp(
+  toNumber(window.__UPNFT_MAX_TARGET_MULTIPLIER__, 1.67),
+  1,
+  20,
+);
+const UPGRADE_MAX_TARGET_OFFSET = clamp(
+  toNumber(window.__UPNFT_MAX_TARGET_OFFSET__, 0),
+  0,
+  1000000,
+);
 
 const DEFAULT_LOCALE = "ru";
 
@@ -135,8 +177,17 @@ const TRANSLATIONS = {
     fair_copy: "Копировать",
     chance_probability: "Вероятность",
     note_select_nft: "Выбери NFT",
+    note_secure_backend_required: "Апгрейд временно недоступен: не подключен защищенный сервер.",
+    note_secure_wallet_required: "Подключи кошелек для защищенного апгрейда.",
+
+    note_upgrade_cooldown: "Cooldown: {seconds}s",
+    note_upgrade_penalty: "Offer lock: {seconds}s",
     button_upgrade_start: "Запустить апгрейд",
     button_upgrade_spin: "Крутим...",
+
+    button_upgrade_queue: "Queue...",
+    button_upgrade_cooldown: "Cooldown {seconds}s",
+    button_upgrade_penalty: "Blocked {seconds}s",
     my_nft_title: "Мои NFT",
     history_title: "История апгрейдов",
     history_clear: "Очистить",
@@ -161,10 +212,22 @@ const TRANSLATIONS = {
     own_empty_not_loaded: "NFT не загружены.",
     nft_status_market: "Маркет",
     nft_status_wallet: "Кошелек",
+    nft_status_telegram: "Telegram",
+    nft_status_bank: "Банк",
     task_status_active: "Активно",
     result_win: "Выигрыш",
     result_loss: "Проигрыш",
     result_error: "Ошибка апгрейда",
+    result_security_reject: "Операция отклонена защитой",
+
+    result_cooldown: "Cooldown active: {seconds}s",
+    result_penalty: "Offer lock: {seconds}s",
+    result_queue_wait: "Queue: ~{seconds}s",
+    result_queue_wait_pos: "Queue #{position}: ~{seconds}s",
+    result_queue_timeout: "Queue wait timeout. Try again.",
+    result_offer_timeout: "Offer expired. Try again later.",
+    result_offer_rejected: "Offer was not accepted.",
+    payout_ton_label: "TON выплата",
     guest_name: "Гость",
     avatar_alt: "Аватар пользователя",
     profile_stat_nft: "NFT",
@@ -179,12 +242,14 @@ const TRANSLATIONS = {
     wallet_balance_loading: "Загрузка...",
     wallet_syncing_nft: "Синхронизация NFT...",
     wallet_nft_load_error: "Ошибка загрузки NFT",
-    wallet_no_nft: "В кошельке нет NFT",
+    wallet_no_nft: "NFT не найдены ни в кошельке, ни в Telegram-профиле.",
     wallet_no_prices: "NFT загружены, цены TON не найдены",
     wallet_nft_count: "NFT: {count}",
     wallet_tonconnect_missing: "TonConnect недоступен",
     wallet_tonconnect_init_error: "Ошибка инициализации TON Connect",
     wallet_connect_failed: "Не удалось подключить кошелек",
+    wallet_disconnect: "Отвязать кошелек",
+    wallet_actions_aria: "Действия кошелька",
     nav_label: "Навигация",
     nav_tasks: "Задания",
     nav_upgrades: "Апгрейды",
@@ -243,8 +308,17 @@ const TRANSLATIONS = {
     fair_copy: "Copy",
     chance_probability: "Probability",
     note_select_nft: "Choose NFT",
+    note_secure_backend_required: "Upgrade is unavailable: secure backend is not configured.",
+    note_secure_wallet_required: "Connect wallet to run a secure upgrade.",
+
+    note_upgrade_cooldown: "Cooldown: {seconds}s",
+    note_upgrade_penalty: "Offer lock: {seconds}s",
     button_upgrade_start: "Start upgrade",
     button_upgrade_spin: "Spinning...",
+
+    button_upgrade_queue: "Queue...",
+    button_upgrade_cooldown: "Cooldown {seconds}s",
+    button_upgrade_penalty: "Blocked {seconds}s",
     my_nft_title: "My NFT",
     history_title: "Upgrade history",
     history_clear: "Clear",
@@ -269,10 +343,22 @@ const TRANSLATIONS = {
     own_empty_not_loaded: "NFT not loaded.",
     nft_status_market: "Market",
     nft_status_wallet: "Wallet",
+    nft_status_telegram: "Telegram",
+    nft_status_bank: "Bank",
     task_status_active: "Active",
     result_win: "Win",
     result_loss: "Lose",
     result_error: "Upgrade error",
+    result_security_reject: "Blocked by security checks",
+
+    result_cooldown: "Cooldown active: {seconds}s",
+    result_penalty: "Offer lock: {seconds}s",
+    result_queue_wait: "Queue: ~{seconds}s",
+    result_queue_wait_pos: "Queue #{position}: ~{seconds}s",
+    result_queue_timeout: "Queue wait timeout. Try again.",
+    result_offer_timeout: "Offer expired. Try again later.",
+    result_offer_rejected: "Offer was not accepted.",
+    payout_ton_label: "TON payout",
     guest_name: "Guest",
     avatar_alt: "User avatar",
     profile_stat_nft: "NFT",
@@ -287,12 +373,14 @@ const TRANSLATIONS = {
     wallet_balance_loading: "Loading...",
     wallet_syncing_nft: "Syncing NFT...",
     wallet_nft_load_error: "NFT loading error",
-    wallet_no_nft: "No NFT in wallet",
+    wallet_no_nft: "No NFT found in wallet or Telegram profile.",
     wallet_no_prices: "NFT loaded, TON prices not found",
     wallet_nft_count: "NFT: {count}",
     wallet_tonconnect_missing: "TonConnect is unavailable",
     wallet_tonconnect_init_error: "TON Connect init error",
     wallet_connect_failed: "Wallet connection failed",
+    wallet_disconnect: "Disconnect wallet",
+    wallet_actions_aria: "Wallet actions",
     nav_label: "Navigation",
     nav_tasks: "Tasks",
     nav_upgrades: "Upgrades",
@@ -351,8 +439,17 @@ const TRANSLATIONS = {
     fair_copy: "Копіювати",
     chance_probability: "Ймовірність",
     note_select_nft: "Обери NFT",
+    note_secure_backend_required: "Апгрейд тимчасово недоступний: не підключено захищений сервер.",
+    note_secure_wallet_required: "Підключи гаманець для захищеного апгрейда.",
+
+    note_upgrade_cooldown: "Cooldown: {seconds}s",
+    note_upgrade_penalty: "Offer lock: {seconds}s",
     button_upgrade_start: "Запустити апгрейд",
     button_upgrade_spin: "Крутимо...",
+
+    button_upgrade_queue: "Queue...",
+    button_upgrade_cooldown: "Cooldown {seconds}s",
+    button_upgrade_penalty: "Blocked {seconds}s",
     my_nft_title: "Мої NFT",
     history_title: "Історія апгрейдів",
     history_clear: "Очистити",
@@ -377,10 +474,22 @@ const TRANSLATIONS = {
     own_empty_not_loaded: "NFT не завантажені.",
     nft_status_market: "Маркет",
     nft_status_wallet: "Гаманець",
+    nft_status_telegram: "Telegram",
+    nft_status_bank: "Банк",
     task_status_active: "Активно",
     result_win: "Виграш",
     result_loss: "Програш",
     result_error: "Помилка апгрейда",
+    result_security_reject: "Операцію відхилено захистом",
+
+    result_cooldown: "Cooldown active: {seconds}s",
+    result_penalty: "Offer lock: {seconds}s",
+    result_queue_wait: "Queue: ~{seconds}s",
+    result_queue_wait_pos: "Queue #{position}: ~{seconds}s",
+    result_queue_timeout: "Queue wait timeout. Try again.",
+    result_offer_timeout: "Offer expired. Try again later.",
+    result_offer_rejected: "Offer was not accepted.",
+    payout_ton_label: "TON виплата",
     guest_name: "Гість",
     avatar_alt: "Аватар користувача",
     profile_stat_nft: "NFT",
@@ -395,12 +504,14 @@ const TRANSLATIONS = {
     wallet_balance_loading: "Завантаження...",
     wallet_syncing_nft: "Синхронізація NFT...",
     wallet_nft_load_error: "Помилка завантаження NFT",
-    wallet_no_nft: "У гаманці немає NFT",
+    wallet_no_nft: "NFT не знайдено ні в гаманці, ні в Telegram-профілі.",
     wallet_no_prices: "NFT завантажені, ціни TON не знайдено",
     wallet_nft_count: "NFT: {count}",
     wallet_tonconnect_missing: "TonConnect недоступний",
     wallet_tonconnect_init_error: "Помилка ініціалізації TON Connect",
     wallet_connect_failed: "Не вдалося підключити гаманець",
+    wallet_disconnect: "Відвʼязати гаманець",
+    wallet_actions_aria: "Дії гаманця",
     nav_label: "Навігація",
     nav_tasks: "Завдання",
     nav_upgrades: "Апгрейди",
@@ -434,6 +545,7 @@ const LOCAL_KEYS = {
   analytics: "upnft_analytics_v2",
   fair: "upnft_fair_v2",
   locale: "upnft_locale_v1",
+  upgradeGuard: "upnft_upgrade_guard_v1",
 };
 
 const state = {
@@ -464,19 +576,28 @@ const state = {
   tonConnectUI: null,
   tonAddress: "",
   refreshWalletData: null,
+  refreshTelegramGifts: null,
   openWalletModal: null,
   refreshWalletLocale: null,
   orbitAngle: 0,
   isSpinning: false,
   spinRafId: null,
   chanceRafId: null,
+  upgradeGuardTimerId: null,
   displayedChance: 0,
   upgradeOutcome: null,
+  upgradeFlow: {
+    waitingQueue: false,
+    cooldownUntil: 0,
+    penaltyUntil: 0,
+  },
   locale: DEFAULT_LOCALE,
   localeSearch: "",
   languageReturnTab: "settings",
   device: "mobile",
   deviceWatchBound: false,
+  layoutRafId: null,
+  navGlowRafId: null,
   currentUser: { ...fallbackUser },
   telegramLanguage: "",
   ui: {
@@ -553,12 +674,16 @@ function detectDeviceProfile() {
   const desktopPlatforms = new Set(["tdesktop", "macos", "web", "weba", "webk", "webz"]);
   const mobilePlatforms = new Set(["android", "ios"]);
   const width = Math.max(window.innerWidth || 0, document.documentElement?.clientWidth || 0);
-
-  if (desktopPlatforms.has(tgPlatform)) return "desktop";
-  if (mobilePlatforms.has(tgPlatform)) return "mobile";
-
   const coarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches === true;
   const touchPoints = toNumber(navigator.maxTouchPoints, 0);
+
+  if (desktopPlatforms.has(tgPlatform)) {
+    // Telegram Desktop often opens Mini Apps in narrow popups.
+    // Use mobile layout for narrow widths to avoid cropped desktop cards.
+    if (width < 980 || coarsePointer || touchPoints > 1) return "mobile";
+    return "desktop";
+  }
+  if (mobilePlatforms.has(tgPlatform)) return "mobile";
 
   if (width >= 920 && !coarsePointer && touchPoints < 2) return "desktop";
   return "mobile";
@@ -592,6 +717,7 @@ function setupDeviceProfileWatcher() {
       if (prev !== state.device) {
         renderAll();
       }
+      scheduleLayoutAnchors();
     }, 120);
   };
 
@@ -603,6 +729,74 @@ function setupDeviceProfileWatcher() {
   }
 
   state.deviceWatchBound = true;
+  scheduleLayoutAnchors();
+}
+
+function refreshLayoutAnchors() {
+  const shell = document.getElementById("app-shell");
+  const sectionsWrap = document.querySelector(".sections-wrap");
+  const walletBubble = document.getElementById("wallet-bubble");
+  const bottomNav = document.querySelector(".bottom-nav");
+  if (!shell || !sectionsWrap) return;
+
+  const shellRect = shell.getBoundingClientRect();
+  let topPad = 4;
+
+  if (walletBubble && !walletBubble.classList.contains("hidden")) {
+    const bubbleRect = walletBubble.getBoundingClientRect();
+    const offsetFromShellTop = bubbleRect.bottom - shellRect.top;
+    topPad = Math.max(8, Math.round(offsetFromShellTop + 8));
+  }
+
+  sectionsWrap.style.setProperty("--sections-top-pad", `${topPad}px`);
+
+  const navHeight = bottomNav ? Math.round(bottomNav.getBoundingClientRect().height) : 88;
+  shell.style.setProperty("--runtime-nav-height", `${Math.max(64, navHeight)}px`);
+  scheduleNavGlowIndicator();
+}
+
+function scheduleLayoutAnchors() {
+  if (state.layoutRafId) {
+    cancelAnimationFrame(state.layoutRafId);
+    state.layoutRafId = null;
+  }
+
+  state.layoutRafId = requestAnimationFrame(() => {
+    state.layoutRafId = null;
+    refreshLayoutAnchors();
+  });
+}
+
+function updateNavGlowIndicator() {
+  const nav = document.querySelector(".bottom-nav");
+  if (!nav) return;
+
+  const activeButton = nav.querySelector(".nav-btn.is-active");
+  if (!activeButton || nav.classList.contains("is-hidden")) {
+    nav.classList.remove("is-ready");
+    return;
+  }
+
+  const navRect = nav.getBoundingClientRect();
+  const buttonRect = activeButton.getBoundingClientRect();
+  const centerX = (buttonRect.left - navRect.left) + (buttonRect.width / 2);
+  const glowWidth = clamp(buttonRect.width * 0.42, 24, 56);
+
+  nav.style.setProperty("--nav-glow-x", `${centerX.toFixed(2)}px`);
+  nav.style.setProperty("--nav-glow-w", `${glowWidth.toFixed(2)}px`);
+  nav.classList.add("is-ready");
+}
+
+function scheduleNavGlowIndicator() {
+  if (state.navGlowRafId) {
+    cancelAnimationFrame(state.navGlowRafId);
+    state.navGlowRafId = null;
+  }
+
+  state.navGlowRafId = requestAnimationFrame(() => {
+    state.navGlowRafId = null;
+    updateNavGlowIndicator();
+  });
 }
 
 function clamp(value, min, max) {
@@ -639,6 +833,70 @@ function randomUnit() {
     return values[0] / 4294967296;
   }
   return Math.random();
+}
+
+function randomBetween(min, max) {
+  const start = toNumber(min, 0);
+  const end = toNumber(max, start);
+  if (end <= start) return start;
+  return start + (randomUnit() * (end - start));
+}
+
+function createClientRequestId() {
+  if (window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  const part = Math.floor(randomUnit() * 1e9).toString(36);
+  return `rq-${Date.now().toString(36)}-${part}`;
+}
+
+function normalizeComparable(value) {
+  return String(value ?? "").trim();
+}
+
+function ensureBindingMatch(actualValue, expectedValue, label) {
+  const actual = normalizeComparable(actualValue);
+  const expected = normalizeComparable(expectedValue);
+  if (!actual || !expected) return;
+  if (actual !== expected) {
+    throw new Error(`Security mismatch: ${label}`);
+  }
+}
+
+function assertUpgradePayloadBinding(payload, context = {}) {
+  const safePayload = payload && typeof payload === "object" ? payload : {};
+  const safeContext = context && typeof context === "object" ? context : {};
+
+  ensureBindingMatch(
+    safePayload.session_id ?? safePayload.sessionId,
+    safeContext.sessionId,
+    "session_id",
+  );
+  ensureBindingMatch(
+    safePayload.client_request_id ?? safePayload.clientRequestId,
+    safeContext.requestId,
+    "client_request_id",
+  );
+  ensureBindingMatch(
+    safePayload.source_nft_id ?? safePayload.sourceNftId,
+    safeContext.sourceId,
+    "source_nft_id",
+  );
+  ensureBindingMatch(
+    safePayload.target_nft_id ?? safePayload.targetNftId,
+    safeContext.targetId,
+    "target_nft_id",
+  );
+  ensureBindingMatch(
+    safePayload.wallet ?? safePayload.wallet_address ?? safePayload.walletAddress,
+    safeContext.wallet,
+    "wallet",
+  );
+  ensureBindingMatch(
+    safePayload.user_id ?? safePayload.userId,
+    safeContext.userId,
+    "user_id",
+  );
 }
 
 function firstNonEmptyString(...values) {
@@ -967,7 +1225,7 @@ function applyStaticLocalization() {
   setText(".upgrade-screen .block-title", t("my_nft_title"));
   setText(".history-head h3", t("history_title"));
   setText("#history-clear-btn", t("history_clear"));
-  setText("#upgrade-btn", state.isSpinning ? t("button_upgrade_spin") : t("button_upgrade_start"));
+  setText("#upgrade-btn", getUpgradeButtonLabel());
   setText("#onboarding-connect", t("onboarding_connect"));
   setText("#onboarding-refresh", t("onboarding_refresh"));
 
@@ -991,6 +1249,7 @@ function applyStaticLocalization() {
   setText(".stat-row div:nth-child(2) span", t("profile_stat_upgrades"));
   setText(".stat-row div:nth-child(3) span", t("profile_stat_winrate"));
   setText(".wallet-btn-text", t("wallet_connect"));
+  setText("#wallet-disconnect-btn", t("wallet_disconnect"));
   if (!state.tonAddress) {
     setText("#wallet-short", t("wallet_not_connected"));
   }
@@ -1017,6 +1276,13 @@ function applyStaticLocalization() {
   if (navCases) navCases.setAttribute("aria-label", t("nav_cases"));
   if (navBonuses) navBonuses.setAttribute("aria-label", t("nav_bonuses"));
   if (navProfile) navProfile.setAttribute("aria-label", t("nav_profile"));
+
+  const walletBubble = document.getElementById("wallet-bubble");
+  const walletMenu = document.getElementById("wallet-menu");
+  if (walletBubble) walletBubble.setAttribute("aria-label", t("wallet_actions_aria"));
+  if (walletMenu) walletMenu.setAttribute("aria-label", t("wallet_actions_aria"));
+
+  scheduleNavGlowIndicator();
 
   const handleNode = document.getElementById("profile-handle");
   const idNode = document.getElementById("profile-id");
@@ -1093,6 +1359,151 @@ function writeLocalJson(key, value) {
   } catch {
     // Ignore storage quota/private mode errors.
   }
+}
+
+function createUpgradeError(code, message = "") {
+  const safeCode = String(code || "upgrade_error");
+  const error = new Error(message || safeCode);
+  error.code = safeCode;
+  return error;
+}
+
+function normalizeUpgradeErrorCode(error) {
+  const directCode = String(error?.code || "").trim().toLowerCase();
+  if (directCode) {
+    if (directCode.startsWith("security")) return "security";
+    if (directCode.startsWith("offer_timeout")) return "offer_timeout";
+    if (directCode.startsWith("offer_rejected")) return "offer_rejected";
+    if (directCode.startsWith("queue_timeout")) return "queue_timeout";
+    if (directCode.startsWith("cooldown")) return "cooldown";
+    if (directCode.startsWith("penalty")) return "penalty";
+    return directCode;
+  }
+
+  const message = String(error?.message || "").toLowerCase();
+  if (message.includes("queue timeout")) return "queue_timeout";
+  if (message.includes("offer timeout")) return "offer_timeout";
+  if (message.includes("offer rejected")) return "offer_rejected";
+  if (message.includes("cooldown")) return "cooldown";
+  if (message.includes("security")) return "security";
+  return "unknown";
+}
+
+function getUpgradeCooldownRemainingMs(referenceTime = nowMs()) {
+  return Math.max(0, toNumber(state.upgradeFlow.cooldownUntil, 0) - referenceTime);
+}
+
+function getUpgradePenaltyRemainingMs(referenceTime = nowMs()) {
+  return Math.max(0, toNumber(state.upgradeFlow.penaltyUntil, 0) - referenceTime);
+}
+
+function persistUpgradeGuardState() {
+  writeLocalJson(LOCAL_KEYS.upgradeGuard, {
+    cooldownUntil: Math.max(0, Math.floor(toNumber(state.upgradeFlow.cooldownUntil, 0))),
+    penaltyUntil: Math.max(0, Math.floor(toNumber(state.upgradeFlow.penaltyUntil, 0))),
+  });
+}
+
+function clearUpgradeGuardExpired() {
+  const now = nowMs();
+  if (toNumber(state.upgradeFlow.cooldownUntil, 0) <= now) {
+    state.upgradeFlow.cooldownUntil = 0;
+  }
+  if (toNumber(state.upgradeFlow.penaltyUntil, 0) <= now) {
+    state.upgradeFlow.penaltyUntil = 0;
+  }
+}
+
+function syncUpgradeGuardTicker() {
+  clearUpgradeGuardExpired();
+  const hasGuardWindow = getUpgradeCooldownRemainingMs() > 0 || getUpgradePenaltyRemainingMs() > 0;
+  if (hasGuardWindow) {
+    if (state.upgradeGuardTimerId) return;
+    state.upgradeGuardTimerId = window.setInterval(() => {
+      clearUpgradeGuardExpired();
+      refreshUpgradeState();
+      if (getUpgradeCooldownRemainingMs() <= 0 && getUpgradePenaltyRemainingMs() <= 0) {
+        clearInterval(state.upgradeGuardTimerId);
+        state.upgradeGuardTimerId = null;
+      }
+    }, 300);
+    return;
+  }
+
+  if (state.upgradeGuardTimerId) {
+    clearInterval(state.upgradeGuardTimerId);
+    state.upgradeGuardTimerId = null;
+  }
+}
+
+function armUpgradeCooldown(extraMs = UPGRADE_COOLDOWN_MS) {
+  const now = nowMs();
+  const cooldownMs = clamp(Math.floor(toNumber(extraMs, UPGRADE_COOLDOWN_MS)), 500, 600000);
+  state.upgradeFlow.cooldownUntil = Math.max(toNumber(state.upgradeFlow.cooldownUntil, 0), now + cooldownMs);
+  persistUpgradeGuardState();
+  syncUpgradeGuardTicker();
+}
+
+function armUpgradePenalty(extraMs = UPGRADE_DECLINE_PENALTY_MS) {
+  const now = nowMs();
+  const penaltyMs = clamp(Math.floor(toNumber(extraMs, UPGRADE_DECLINE_PENALTY_MS)), 1000, 900000);
+  state.upgradeFlow.penaltyUntil = Math.max(toNumber(state.upgradeFlow.penaltyUntil, 0), now + penaltyMs);
+  state.upgradeFlow.cooldownUntil = Math.max(toNumber(state.upgradeFlow.cooldownUntil, 0), now + Math.min(penaltyMs, UPGRADE_OFFER_TTL_MS));
+  persistUpgradeGuardState();
+  syncUpgradeGuardTicker();
+}
+
+function getUpgradeButtonLabel() {
+  if (state.isSpinning && state.upgradeFlow.waitingQueue) {
+    return t("button_upgrade_queue");
+  }
+  if (state.isSpinning) {
+    return t("button_upgrade_spin");
+  }
+
+  const penaltyLeft = getUpgradePenaltyRemainingMs();
+  if (penaltyLeft > 0) {
+    return t("button_upgrade_penalty", { seconds: Math.max(1, Math.ceil(penaltyLeft / 1000)) });
+  }
+
+  const cooldownLeft = getUpgradeCooldownRemainingMs();
+  if (cooldownLeft > 0) {
+    return t("button_upgrade_cooldown", { seconds: Math.max(1, Math.ceil(cooldownLeft / 1000)) });
+  }
+
+  return t("button_upgrade_start");
+}
+
+function formatTargetLimitNote(maxTargetValue) {
+  const maxText = formatTon(maxTargetValue);
+  if (state.locale === "en") return `Max target: ${maxText}`;
+  if (state.locale === "uk") return `Макс ціль: ${maxText}`;
+  return `Макс цель: ${maxText}`;
+}
+
+function formatTargetLimitError(maxTargetValue) {
+  const maxText = formatTon(maxTargetValue);
+  if (state.locale === "en") return `Target is above limit (${maxText})`;
+  if (state.locale === "uk") return `Ціль вище ліміту (${maxText})`;
+  return `Цель выше лимита (${maxText})`;
+}
+
+function getUpgradeErrorMessage(error) {
+  const code = normalizeUpgradeErrorCode(error);
+  if (code === "queue_timeout") return t("result_queue_timeout");
+  if (code === "offer_timeout") return t("result_offer_timeout");
+  if (code === "offer_rejected") return t("result_offer_rejected");
+  if (code === "target_limit") {
+    return formatTargetLimitError(toNumber(error?.maxTargetValue, 0));
+  }
+  if (code === "cooldown") {
+    return t("result_cooldown", { seconds: Math.max(1, Math.ceil(getUpgradeCooldownRemainingMs() / 1000)) });
+  }
+  if (code === "penalty") {
+    return t("result_penalty", { seconds: Math.max(1, Math.ceil(getUpgradePenaltyRemainingMs() / 1000)) });
+  }
+  if (code === "security") return t("result_security_reject");
+  return t("result_error");
 }
 
 function shortHash(value, prefix = 8, suffix = 8) {
@@ -1240,6 +1651,15 @@ function loadPersistentData() {
       ready: false,
     };
   }
+
+  const savedUpgradeGuard = readLocalJson(LOCAL_KEYS.upgradeGuard, null);
+  if (savedUpgradeGuard && typeof savedUpgradeGuard === "object") {
+    state.upgradeFlow.cooldownUntil = Math.max(0, Math.floor(toNumber(savedUpgradeGuard.cooldownUntil, 0)));
+    state.upgradeFlow.penaltyUntil = Math.max(0, Math.floor(toNumber(savedUpgradeGuard.penaltyUntil, 0)));
+  }
+  clearUpgradeGuardExpired();
+  persistUpgradeGuardState();
+  syncUpgradeGuardTicker();
 }
 
 async function sha256Hex(input) {
@@ -1454,8 +1874,32 @@ function appendInBatches(container, items, buildNode, chunkSize = RENDER_CHUNK_S
   renderChunk();
 }
 
-function getFilteredTargets() {
-  const filtered = filterNfts(state.data.targets, state.ui.targetSearch);
+function getMaxTargetValueForSourceValue(sourceValue) {
+  const safeSourceValue = toNumber(sourceValue, NaN);
+  if (!Number.isFinite(safeSourceValue) || safeSourceValue <= 0) return 0;
+  const raised = (safeSourceValue * UPGRADE_MAX_TARGET_MULTIPLIER) + UPGRADE_MAX_TARGET_OFFSET;
+  return Math.max(safeSourceValue, raised);
+}
+
+function getMaxTargetValueForSource(source) {
+  return getMaxTargetValueForSourceValue(source?.value);
+}
+
+function isTargetWithinUpgradeLimit(source, target) {
+  if (!source || !target) return false;
+  const maxTargetValue = getMaxTargetValueForSource(source);
+  if (!Number.isFinite(maxTargetValue) || maxTargetValue <= 0) return false;
+  return toNumber(target?.value, 0) <= (maxTargetValue + 1e-9);
+}
+
+function getEligibleTargetsForSource(source, list = state.data.targets) {
+  if (!source) return [];
+  return safeArray(list).filter((target) => isTargetWithinUpgradeLimit(source, target));
+}
+
+function getFilteredTargets(source = byId(state.data.inventory, state.selectedOwnId)) {
+  const eligibleTargets = getEligibleTargetsForSource(source, state.data.targets);
+  const filtered = filterNfts(eligibleTargets, state.ui.targetSearch);
   return sortNfts(filtered, state.ui.targetSort);
 }
 
@@ -1689,12 +2133,14 @@ function formatTonFromNano(nanoValue) {
   }
 }
 
-async function fetchJsonWithTimeout(url, timeoutMs = 9000) {
+async function fetchJsonWithTimeout(url, timeoutMs = 9000, requestInit = null) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   markNetworkRequestStart();
   try {
+    const baseOptions = requestInit && typeof requestInit === "object" ? requestInit : {};
     const response = await fetch(url, {
+      ...baseOptions,
       cache: "no-store",
       signal: controller.signal,
     });
@@ -1917,7 +2363,142 @@ function buildNftModelFromTonapiItem(item, value, fallbackId) {
     backgroundImageUrl: pickNftBackgroundImageUrl(item),
     collectionAddress: String(item?.collection?.address ?? "").trim(),
     listed: Boolean(item?.sale),
+    source: "wallet",
   };
+}
+
+function buildNftModelFromTelegramGift(item, index) {
+  const giftId = String(
+    item?.nft_address
+    ?? item?.nftAddress
+    ?? item?.id
+    ?? item?.gift_id
+    ?? item?.giftId
+    ?? `tg-gift-${index + 1}`,
+  ).trim();
+  if (!giftId) return null;
+
+  const animationUrl = normalizeMediaUrl(firstNonEmptyString(
+    item?.animation_url,
+    item?.animationUrl,
+    item?.video_url,
+    item?.videoUrl,
+    item?.media_url,
+    item?.mediaUrl,
+  ));
+
+  const imageUrl = normalizeMediaUrl(firstNonEmptyString(
+    item?.image_url,
+    item?.imageUrl,
+    item?.photo_url,
+    item?.photoUrl,
+    item?.thumbnail_url,
+    item?.thumbnailUrl,
+    item?.preview_url,
+    item?.previewUrl,
+  ));
+
+  const priceTon = toNumber(
+    item?.price_ton
+    ?? item?.priceTon
+    ?? item?.ton_price
+    ?? item?.tonPrice
+    ?? item?.value,
+    NaN,
+  );
+
+  const isFromBlockchain = Boolean(item?.is_from_blockchain ?? item?.isFromBlockchain);
+  const normalizedTier = String(
+    item?.tier
+    ?? item?.rarity
+    ?? (item?.is_unique || item?.isUnique ? "Rare" : "Common"),
+  ).trim() || "Common";
+
+  return {
+    id: giftId,
+    name: String(item?.name ?? item?.title ?? "Telegram Gift").trim() || "Telegram Gift",
+    tier: normalizedTier,
+    value: Number.isFinite(priceTon) && priceTon > 0 ? priceTon : NaN,
+    imageUrl,
+    animationUrl: !isUnsupportedAnimationUrl(animationUrl) ? animationUrl : "",
+    backgroundColor: normalizeColorValue(
+      item?.background_color
+      ?? item?.backgroundColor
+      ?? item?.bg_color
+      ?? item?.bgColor
+      ?? "",
+    ),
+    backgroundImageUrl: normalizeMediaUrl(firstNonEmptyString(
+      item?.background_image,
+      item?.backgroundImage,
+      item?.pattern_url,
+      item?.patternUrl,
+    )),
+    collectionAddress: "telegram-gifts",
+    listed: Boolean(item?.listed ?? false),
+    source: isFromBlockchain ? "wallet" : "telegram",
+  };
+}
+
+function mergeUniqueNfts(...lists) {
+  const map = new Map();
+  lists.forEach((list) => {
+    safeArray(list).forEach((item) => {
+      const id = String(item?.id ?? "").trim();
+      if (!id) return;
+      if (!map.has(id)) {
+        map.set(id, item);
+        return;
+      }
+
+      const prev = map.get(id);
+      const prevHasPrice = Number.isFinite(toNumber(prev?.value, NaN)) && toNumber(prev?.value, NaN) > 0;
+      const nextHasPrice = Number.isFinite(toNumber(item?.value, NaN)) && toNumber(item?.value, NaN) > 0;
+      if (!prevHasPrice && nextHasPrice) {
+        map.set(id, { ...prev, ...item });
+      }
+    });
+  });
+  return Array.from(map.values());
+}
+
+async function fetchTelegramProfileGifts(ownerAddress = "") {
+  const endpoint = TELEGRAM_GIFTS_ENDPOINT;
+  const userId = String(state.currentUser?.id ?? "").trim();
+  if (!endpoint || !userId) return [];
+
+  let url;
+  try {
+    url = new URL(endpoint, window.location.href);
+  } catch {
+    return [];
+  }
+
+  url.searchParams.set("user_id", userId);
+  if (state.currentUser?.username) {
+    url.searchParams.set("username", String(state.currentUser.username).trim());
+  }
+  if (ownerAddress) {
+    url.searchParams.set("wallet", String(ownerAddress).trim());
+  }
+
+  const initData = String(window.Telegram?.WebApp?.initData ?? "").trim();
+  const headers = {};
+  if (initData) {
+    headers["X-Telegram-Init-Data"] = initData;
+  }
+
+  const payload = await fetchJsonWithTimeout(
+    url.toString(),
+    12000,
+    Object.keys(headers).length ? { headers } : null,
+  );
+
+  if (!payload) return [];
+  const items = safeArray(payload?.gifts ?? payload?.items ?? payload?.result);
+  return items
+    .map((item, index) => buildNftModelFromTelegramGift(item, index))
+    .filter(Boolean);
 }
 
 async function fetchAccountNftItemsPage(owner, indirectOwnership) {
@@ -1950,17 +2531,21 @@ async function fetchAccountNftItems(address) {
   const owner = String(address || "").trim();
   if (!owner) return [];
 
-  const ownDirect = await fetchAccountNftItemsPage(owner, false);
-  if (ownDirect === null) return null;
-  if (ownDirect.length > 0) return ownDirect;
+  // Try multiple TonAPI ownership modes because behavior differs across wallets.
+  const modes = [null, false, true];
+  let hadValidResponse = false;
+  let fallback = [];
 
-  const ownIndirect = await fetchAccountNftItemsPage(owner, true);
-  if (ownIndirect === null) return ownDirect;
-  if (ownIndirect.length > 0) return ownIndirect;
+  for (const mode of modes) {
+    const items = await fetchAccountNftItemsPage(owner, mode);
+    if (items === null) continue;
 
-  const ownDefault = await fetchAccountNftItemsPage(owner, null);
-  if (ownDefault === null) return ownDirect;
-  return ownDefault.length > 0 ? ownDefault : ownDirect;
+    hadValidResponse = true;
+    if (items.length > 0) return items;
+    fallback = items;
+  }
+
+  return hadValidResponse ? fallback : null;
 }
 
 async function fetchCollectionMarketSnapshot(collectionAddress, ownerAddress) {
@@ -1990,6 +2575,447 @@ async function fetchCollectionMarketSnapshot(collectionAddress, ownerAddress) {
   }
 
   return { collectionAddress: collection, floorTon, listings };
+}
+
+function buildOwnedInventoryLists(ownItems, floorByCollection, prefix = "owned", sourceTag = "wallet") {
+  const profileInventory = [];
+  const inventory = [];
+
+  safeArray(ownItems).forEach((item, index) => {
+    const listedPriceTon = parseTonPriceNode(item?.sale?.price);
+    const collectionAddress = String(item?.collection?.address ?? "").trim();
+    const floorTon = floorByCollection.get(collectionAddress) ?? null;
+    const resolvedValue = Number.isFinite(listedPriceTon) && listedPriceTon > 0
+      ? listedPriceTon
+      : floorTon;
+
+    const profileItem = buildNftModelFromTonapiItem(
+      item,
+      Number.isFinite(resolvedValue) ? resolvedValue : NaN,
+      `${prefix}-${index + 1}`,
+    );
+    if (!profileItem) return;
+
+    const taggedProfile = { ...profileItem, source: sourceTag };
+    profileInventory.push(taggedProfile);
+
+    if (Number.isFinite(resolvedValue) && resolvedValue > 0) {
+      inventory.push({ ...taggedProfile, value: resolvedValue, source: sourceTag });
+    }
+  });
+
+  return { profileInventory, inventory };
+}
+
+async function fetchBankWalletTargets() {
+  const bankAddress = String(BANK_WALLET_ADDRESS || "").trim();
+  if (!bankAddress) return [];
+
+  const ownItems = await fetchAccountNftItems(bankAddress);
+  if (!ownItems || ownItems.length === 0) return [];
+
+  const uniqueCollections = Array.from(
+    new Set(
+      ownItems
+        .map((item) => String(item?.collection?.address ?? "").trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, Math.max(MAX_COLLECTIONS_FOR_MARKET, 12));
+
+  const snapshots = await Promise.all(
+    uniqueCollections.map((collectionAddress) => fetchCollectionMarketSnapshot(collectionAddress, bankAddress)),
+  );
+
+  const floorByCollection = new Map();
+  snapshots.forEach((snapshot) => {
+    if (Number.isFinite(snapshot.floorTon) && snapshot.floorTon > 0) {
+      floorByCollection.set(snapshot.collectionAddress, snapshot.floorTon);
+    }
+  });
+
+  const { inventory } = buildOwnedInventoryLists(ownItems, floorByCollection, "bank-owned", "bank");
+  return inventory
+    .filter((item) => Number.isFinite(item.value) && item.value > 0)
+    .sort((left, right) => left.value - right.value)
+    .slice(0, MAX_TARGETS);
+}
+
+function normalizeBackendNft(rawNft, fallbackTarget = null) {
+  const raw = rawNft && typeof rawNft === "object" ? rawNft : {};
+  const fallback = fallbackTarget && typeof fallbackTarget === "object" ? fallbackTarget : {};
+
+  const name = String(raw.name ?? raw.title ?? fallback.name ?? "").trim();
+  const value = toNumber(raw.value ?? raw.price ?? fallback.value, NaN);
+  const animationUrl = normalizeMediaUrl(firstNonEmptyString(
+    raw.animationUrl,
+    raw.animation_url,
+    raw.videoUrl,
+    raw.video_url,
+    raw.animation,
+    raw.video,
+    fallback.animationUrl,
+  ));
+
+  if (!name || !Number.isFinite(value) || value < 0) return null;
+
+  return {
+    id: String(raw.id ?? fallback.id ?? `reward-${Date.now()}`),
+    name,
+    tier: String(raw.tier ?? raw.rarity ?? fallback.tier ?? "Unknown"),
+    value,
+    imageUrl: normalizeMediaUrl(firstNonEmptyString(
+      raw.imageUrl,
+      raw.image_url,
+      raw.image,
+      raw.photo_url,
+      raw.photoUrl,
+      raw.preview,
+      fallback.imageUrl,
+    )),
+    animationUrl: !isUnsupportedAnimationUrl(animationUrl) ? animationUrl : "",
+    backgroundColor: normalizeColorValue(
+      raw.backgroundColor
+      ?? raw.background_color
+      ?? fallback.backgroundColor
+      ?? "",
+    ),
+    backgroundImageUrl: normalizeMediaUrl(firstNonEmptyString(
+      raw.backgroundImageUrl,
+      raw.background_image,
+      raw.patternUrl,
+      raw.pattern_url,
+      fallback.backgroundImageUrl,
+    )),
+    collectionAddress: String(raw.collectionAddress ?? raw.collection_address ?? fallback.collectionAddress ?? "").trim(),
+    listed: Boolean(raw.listed ?? fallback.listed),
+    source: String(raw.source ?? "bank"),
+  };
+}
+
+async function postUpgradeApi(path, payload) {
+  const base = String(UPGRADE_API_BASE || "").trim().replace(/\/$/, "");
+  if (!base) return null;
+
+  const initData = String(window.Telegram?.WebApp?.initData ?? "").trim();
+  const headers = {
+    "Content-Type": "application/json",
+  };
+  if (initData) {
+    headers["X-Telegram-Init-Data"] = initData;
+  }
+
+  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  return fetchJsonWithTimeout(
+    url,
+    20000,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload || {}),
+    },
+  );
+}
+
+function sleepMs(durationMs) {
+  const timeoutMs = Math.max(0, Math.floor(toNumber(durationMs, 0)));
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, timeoutMs);
+  });
+}
+
+function parseUpgradeQueueState(payload) {
+  const queue = payload?.queue && typeof payload.queue === "object" ? payload.queue : {};
+  const status = String(payload?.status ?? queue.status ?? "").trim().toLowerCase();
+  const queued = (
+    payload?.queued === true
+    || payload?.pending === true
+    || queue.queued === true
+    || queue.pending === true
+    || ["queued", "pending", "enqueued", "waiting", "wait"].includes(status)
+  );
+  const retryAfterMsRaw = toNumber(
+    payload?.retry_after_ms
+    ?? payload?.retryAfterMs
+    ?? queue.retry_after_ms
+    ?? queue.retryAfterMs
+    ?? payload?.poll_after_ms
+    ?? payload?.pollAfterMs,
+    NaN,
+  );
+  const etaMsRaw = toNumber(
+    payload?.eta_ms
+    ?? payload?.etaMs
+    ?? payload?.wait_ms
+    ?? payload?.waitMs
+    ?? queue.eta_ms
+    ?? queue.etaMs,
+    NaN,
+  );
+  const positionRaw = toNumber(
+    payload?.queue_position
+    ?? payload?.queuePosition
+    ?? queue.position
+    ?? queue.queue_position,
+    NaN,
+  );
+  return {
+    queued,
+    status,
+    retryAfterMs: Number.isFinite(retryAfterMsRaw) ? Math.max(0, retryAfterMsRaw) : NaN,
+    etaMs: Number.isFinite(etaMsRaw) ? Math.max(0, etaMsRaw) : NaN,
+    position: Number.isFinite(positionRaw) ? Math.max(0, Math.floor(positionRaw)) : NaN,
+  };
+}
+
+async function waitForPreparedUpgrade(preparePayload, onQueueUpdate = null) {
+  const startedAt = nowMs();
+  const deadline = startedAt + UPGRADE_QUEUE_MAX_WAIT_MS;
+
+  while (true) {
+    const prepared = await postUpgradeApi("/upgrade/prepare", preparePayload);
+    if (!prepared || prepared.ok === false) {
+      throw createUpgradeError("security_prepare_failed", "Security: prepare failed");
+    }
+
+    const queueState = parseUpgradeQueueState(prepared);
+    if (!queueState.queued) {
+      if (typeof onQueueUpdate === "function") {
+        onQueueUpdate({
+          queued: false,
+          waitMs: 0,
+          retryAfterMs: 0,
+          position: NaN,
+        });
+      }
+      return prepared;
+    }
+
+    const remainingMs = deadline - nowMs();
+    if (remainingMs <= 0) {
+      throw createUpgradeError("queue_timeout", "Queue timeout");
+    }
+
+    const waitHint = Number.isFinite(queueState.retryAfterMs)
+      ? queueState.retryAfterMs
+      : (Number.isFinite(queueState.etaMs) ? queueState.etaMs : UPGRADE_QUEUE_POLL_MS);
+    const waitMs = clamp(Math.floor(waitHint), 450, Math.min(5000, remainingMs));
+
+    if (typeof onQueueUpdate === "function") {
+      onQueueUpdate({
+        queued: true,
+        waitMs,
+        retryAfterMs: queueState.retryAfterMs,
+        etaMs: queueState.etaMs,
+        position: queueState.position,
+        remainingMs,
+      });
+    }
+
+    await sleepMs(waitMs);
+  }
+}
+
+async function sendWalletTransactionWithTimeout(txRequest, timeoutMs = UPGRADE_OFFER_TTL_MS) {
+  if (!state.tonConnectUI?.sendTransaction) {
+    throw createUpgradeError("security_wallet_transport", "Security: wallet transport unavailable");
+  }
+
+  const safeTimeoutMs = clamp(Math.floor(toNumber(timeoutMs, UPGRADE_OFFER_TTL_MS)), 5000, 180000);
+  let timeoutId = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => {
+      reject(createUpgradeError("offer_timeout", "Offer timeout"));
+    }, safeTimeoutMs);
+  });
+
+  try {
+    return await Promise.race([
+      state.tonConnectUI.sendTransaction(txRequest),
+      timeoutPromise,
+    ]);
+  } catch (error) {
+    const message = String(error?.message || error || "").toLowerCase();
+    if (normalizeUpgradeErrorCode(error) === "offer_timeout") {
+      throw error;
+    }
+    if (
+      message.includes("reject")
+      || message.includes("decline")
+      || message.includes("cancel")
+      || message.includes("denied")
+      || message.includes("closed")
+    ) {
+      throw createUpgradeError("offer_rejected", "Offer rejected");
+    }
+    throw error;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
+async function reportUpgradeAbort(sessionId, requestId, reasonCode = "client_abort") {
+  const safeSessionId = String(sessionId || "").trim();
+  if (!safeSessionId || !UPGRADE_API_BASE) return;
+  await postUpgradeApi("/upgrade/abort", {
+    session_id: safeSessionId,
+    client_request_id: String(requestId || "").trim(),
+    reason: String(reasonCode || "client_abort"),
+  });
+}
+
+async function resolveUpgradeViaBackend({ source, target, chance, onQueueUpdate = null }) {
+  if (!UPGRADE_API_BASE) return null;
+  if (!state.tonAddress) {
+    throw createUpgradeError("security_wallet_required", "Security: wallet is required");
+  }
+  const maxTargetValue = getMaxTargetValueForSource(source);
+  if (!isTargetWithinUpgradeLimit(source, target)) {
+    const limitError = createUpgradeError("target_limit", "Target above allowed cap");
+    limitError.maxTargetValue = maxTargetValue;
+    throw limitError;
+  }
+
+  const requestId = createClientRequestId();
+  const binding = {
+    requestId,
+    sourceId: source?.id ?? "",
+    targetId: target?.id ?? "",
+    wallet: state.tonAddress,
+    userId: state.currentUser?.id ?? "",
+  };
+
+  const preparePayload = {
+    user_id: state.currentUser?.id ?? null,
+    username: state.currentUser?.username ?? "",
+    wallet: state.tonAddress || "",
+    client_request_id: requestId,
+    source_nft_id: source?.id ?? "",
+    target_nft_id: target?.id ?? "",
+    source_value: toNumber(source?.value, 0),
+    target_value: toNumber(target?.value, 0),
+    chance: toNumber(chance, 0),
+    limits: {
+      max_target_value: maxTargetValue,
+      max_target_multiplier: UPGRADE_MAX_TARGET_MULTIPLIER,
+      max_target_offset: UPGRADE_MAX_TARGET_OFFSET,
+    },
+    bank_wallet: BANK_WALLET_ADDRESS,
+    settlement: {
+      stake_offer_required: true,
+      stake_escrow_mode: "temporary",
+      stake_to_bank_always: true,
+      win_stake_disposition: "convert_to_ton_for_bank",
+      win_reward_mode: "nft_offer",
+      win_reward_fallback_mode: "ton_payout_if_nft_unavailable",
+      lose_stake_disposition: "bank_in_kind_nft",
+      reward_offer_required: true,
+    },
+    security: {
+      strict: true,
+      fail_closed: true,
+    },
+    queue: {
+      enabled: true,
+      mode: "fifo",
+      max_wait_ms: UPGRADE_QUEUE_MAX_WAIT_MS,
+      poll_ms: UPGRADE_QUEUE_POLL_MS,
+      offer_timeout_ms: UPGRADE_OFFER_TTL_MS,
+      serialize_per_wallet: true,
+      serialize_per_user: true,
+      max_parallel_per_wallet: 1,
+    },
+    rate_limit: {
+      min_interval_ms: UPGRADE_COOLDOWN_MS,
+      max_parallel: 1,
+    },
+  };
+
+  let sessionId = "";
+  try {
+    const prepared = await waitForPreparedUpgrade(preparePayload, onQueueUpdate);
+
+    sessionId = String(prepared?.session_id ?? prepared?.sessionId ?? "").trim();
+    if (!sessionId) {
+      throw createUpgradeError("security_missing_session", "Security: missing session_id");
+    }
+
+    assertUpgradePayloadBinding(prepared, {
+      ...binding,
+      sessionId,
+    });
+
+    const txRequest = prepared?.tx ?? prepared?.escrow?.tx ?? null;
+    if (!txRequest) {
+      throw createUpgradeError("security_missing_stake_tx", "Security: missing stake transaction");
+    }
+    await sendWalletTransactionWithTimeout(txRequest, UPGRADE_OFFER_TTL_MS);
+
+    const payload = await postUpgradeApi("/upgrade/resolve", {
+      session_id: sessionId,
+      client_request_id: requestId,
+    });
+    if (!payload || payload.ok === false) {
+      throw createUpgradeError("security_resolve_failed", "Security: resolve failed");
+    }
+
+    assertUpgradePayloadBinding(payload, {
+      ...binding,
+      sessionId,
+    });
+
+    const rewardOfferTx = payload?.reward_offer_tx ?? payload?.rewardOfferTx ?? null;
+    if (rewardOfferTx) {
+      await sendWalletTransactionWithTimeout(rewardOfferTx, UPGRADE_OFFER_TTL_MS);
+    }
+
+    if (typeof payload.success !== "boolean") {
+      throw createUpgradeError("security_invalid_success", "Security: invalid success flag");
+    }
+    const success = payload.success;
+    const targetAngleRaw = toNumber(payload.target_angle ?? payload.targetAngle, NaN);
+    const targetAngle = Number.isFinite(targetAngleRaw)
+      ? targetAngleRaw
+      : (success ? randomBetween(6, Math.max(8, chance - 1.2)) : randomBetween(Math.min(97, chance + 1.2), 99.4)) * 3.6;
+
+    const rewardModeRaw = String(payload.reward_mode ?? payload.rewardMode ?? "").trim().toLowerCase();
+    const payoutTon = toNumber(payload.payout_ton ?? payload.payoutTon, NaN);
+    const rewardMode = rewardModeRaw || ((success && Number.isFinite(payoutTon) && payoutTon > 0) ? "ton" : "nft");
+
+    const rewardNft = normalizeBackendNft(
+      payload.reward_nft
+      ?? payload.rewardNft
+      ?? payload.target_nft
+      ?? payload.targetNft,
+      target,
+    );
+
+    if (success && rewardMode === "nft" && !rewardNft) {
+      throw createUpgradeError("security_missing_reward", "Security: missing reward NFT on WIN");
+    }
+    if (success && rewardMode === "ton" && !(Number.isFinite(payoutTon) && payoutTon > 0)) {
+      throw createUpgradeError("security_invalid_payout", "Security: invalid TON payout on WIN");
+    }
+
+    return {
+      success,
+      targetAngle,
+      rewardMode,
+      payoutTon,
+      targetNft: rewardNft || target,
+      commitment: String(payload.commitment ?? state.fair.commitment ?? ""),
+      serverSeed: String(payload.server_seed ?? payload.serverSeed ?? state.fair.serverSeed ?? ""),
+      digest: String(payload.digest ?? payload.hash ?? ""),
+      nonce: toNumber(payload.nonce, state.fair.nonce),
+    };
+  } catch (error) {
+    const errorCode = normalizeUpgradeErrorCode(error);
+    if (sessionId && ["offer_timeout", "offer_rejected", "security"].includes(errorCode)) {
+      await reportUpgradeAbort(sessionId, requestId, errorCode);
+    }
+    throw error;
+  }
 }
 
 async function fetchWalletMarketData(address) {
@@ -2056,15 +3082,36 @@ async function fetchWalletMarketData(address) {
     }
   });
 
+  const telegramGifts = await fetchTelegramProfileGifts(ownerAddress);
+  const profileMerged = mergeUniqueNfts(profileInventory, telegramGifts);
+  const pricedTelegramGifts = telegramGifts.filter((item) => Number.isFinite(item.value) && item.value > 0);
+  const inventoryMerged = mergeUniqueNfts(inventory, pricedTelegramGifts);
+
   const targets = Array.from(targetMap.values())
     .filter((item) => Number.isFinite(item.value) && item.value > 0)
     .sort((left, right) => left.value - right.value)
     .slice(0, MAX_TARGETS);
 
   return {
-    profileInventory,
-    inventory,
+    profileInventory: profileMerged,
+    inventory: inventoryMerged,
     targets,
+  };
+}
+
+async function fetchTelegramOnlyMarketData() {
+  const telegramGifts = await fetchTelegramProfileGifts("");
+  if (!telegramGifts.length) {
+    return {
+      profileInventory: [],
+      inventory: [],
+    };
+  }
+
+  const pricedTelegramGifts = telegramGifts.filter((item) => Number.isFinite(item.value) && item.value > 0);
+  return {
+    profileInventory: telegramGifts,
+    inventory: pricedTelegramGifts,
   };
 }
 
@@ -2133,6 +3180,7 @@ function normalizeNftList(rawList, prefix) {
           item?.pattern_url,
         )),
         listed: Boolean(item?.listed),
+        source: String(item?.source ?? "").trim() || "wallet",
       };
     })
     .filter(Boolean);
@@ -2222,8 +3270,10 @@ function ensureSelectedIds() {
     state.selectedOwnId = state.data.inventory[0]?.id ?? null;
   }
 
-  if (!byId(state.data.targets, state.selectedTargetId)) {
-    state.selectedTargetId = state.data.targets[0]?.id ?? null;
+  const source = byId(state.data.inventory, state.selectedOwnId);
+  const eligibleTargets = getEligibleTargetsForSource(source, state.data.targets);
+  if (!byId(eligibleTargets, state.selectedTargetId)) {
+    state.selectedTargetId = eligibleTargets[0]?.id ?? null;
   }
 }
 
@@ -2260,6 +3310,8 @@ function setupTabs() {
 
     if (bottomNav) bottomNav.classList.toggle("is-hidden", !isMainTab);
     if (appShell) appShell.classList.toggle("is-internal-screen", !isMainTab);
+    scheduleLayoutAnchors();
+    scheduleNavGlowIndicator();
   };
 
   buttons.forEach((button) => {
@@ -2269,6 +3321,7 @@ function setupTabs() {
   state.setTab = setTab;
   const defaultTab = document.querySelector(".nav-btn.is-active")?.dataset.tab || "upgrades";
   setTab(defaultTab);
+  scheduleNavGlowIndicator();
 }
 
 function createTonIcon() {
@@ -2389,7 +3442,13 @@ function createNftCardBody(nft) {
 
   const status = document.createElement("span");
   status.className = `nft-status${nft.listed ? " is-listed" : ""}`;
-  status.textContent = nft.listed ? t("nft_status_market") : t("nft_status_wallet");
+  if (nft.source === "telegram") {
+    status.textContent = t("nft_status_telegram");
+  } else if (nft.source === "bank") {
+    status.textContent = t("nft_status_bank");
+  } else {
+    status.textContent = nft.listed ? t("nft_status_market") : t("nft_status_wallet");
+  }
 
   meta.append(tier, status);
   body.append(title, meta);
@@ -2483,9 +3542,11 @@ function renderTargetChips() {
   ensureSelectedIds();
   const list = document.getElementById("target-nft-list");
   const emptyNode = document.getElementById("target-empty");
+  const source = byId(state.data.inventory, state.selectedOwnId);
+  const eligibleTargets = getEligibleTargetsForSource(source, state.data.targets);
   list.innerHTML = "";
 
-  const filteredTargets = getFilteredTargets();
+  const filteredTargets = getFilteredTargets(source);
   if (!byId(filteredTargets, state.selectedTargetId)) {
     state.selectedTargetId = filteredTargets[0]?.id ?? null;
   }
@@ -2514,9 +3575,15 @@ function renderTargetChips() {
   });
 
   if (emptyNode) {
-    emptyNode.textContent = state.data.targets.length > 0
-      ? t("target_empty_filter")
-      : t("target_empty_unavailable");
+    if (!source) {
+      emptyNode.textContent = t("note_select_nft");
+    } else if (state.data.targets.length > 0 && eligibleTargets.length === 0) {
+      emptyNode.textContent = formatTargetLimitNote(getMaxTargetValueForSource(source));
+    } else if (state.data.targets.length > 0) {
+      emptyNode.textContent = t("target_empty_filter");
+    } else {
+      emptyNode.textContent = t("target_empty_unavailable");
+    }
   }
   hideElementById("target-empty", filteredTargets.length > 0);
 }
@@ -2527,17 +3594,37 @@ function renderOwnNftCards() {
   const emptyNode = document.getElementById("own-empty");
   list.innerHTML = "";
 
-  const filteredOwn = getFilteredOwnNfts();
-  if (!byId(filteredOwn, state.selectedOwnId)) {
-    state.selectedOwnId = filteredOwn[0]?.id ?? null;
+  const pricedList = getFilteredOwnNfts();
+  const pricedIds = new Set(state.data.inventory.map((item) => item.id));
+  let displayList = pricedList;
+  let readonlyFallback = false;
+
+  if (displayList.length === 0 && state.data.profileInventory.length > 0) {
+    const filteredProfile = filterNfts(state.data.profileInventory, state.ui.ownSearch);
+    displayList = sortNfts(filteredProfile, state.ui.ownSort);
+    readonlyFallback = true;
   }
 
-  appendInBatches(list, filteredOwn, (nft) => {
-    const card = createOwnNftCard(nft, nft.id === state.selectedOwnId);
+  if (readonlyFallback) {
+    state.selectedOwnId = null;
+  } else if (!byId(displayList, state.selectedOwnId)) {
+    state.selectedOwnId = displayList[0]?.id ?? null;
+  }
+
+  appendInBatches(list, displayList, (nft) => {
+    const canUseForUpgrade = pricedIds.has(nft.id);
+    const card = createOwnNftCard(nft, canUseForUpgrade && nft.id === state.selectedOwnId);
+
+    if (!canUseForUpgrade) {
+      card.classList.add("is-readonly");
+      return card;
+    }
+
     card.addEventListener("click", () => {
       if (state.isSpinning) return;
       state.selectedOwnId = nft.id;
       renderOwnNftCards();
+      renderTargetChips();
       refreshUpgradeState();
     });
     return card;
@@ -2546,14 +3633,14 @@ function renderOwnNftCards() {
   if (emptyNode) {
     if (state.data.profileInventory.length > 0 && state.data.inventory.length === 0) {
       emptyNode.textContent = t("own_empty_no_price");
-    } else if (state.data.inventory.length > 0 && filteredOwn.length === 0) {
+    } else if ((state.data.inventory.length > 0 || state.data.profileInventory.length > 0) && displayList.length === 0) {
       emptyNode.textContent = t("own_empty_filter");
     } else {
       emptyNode.textContent = t("own_empty_not_loaded");
     }
   }
 
-  hideElementById("own-empty", filteredOwn.length > 0);
+  hideElementById("own-empty", displayList.length > 0);
 }
 
 function calculateChance(source, target) {
@@ -2577,28 +3664,92 @@ function applyChanceOutcomeVisual() {
 
 function refreshUpgradeState() {
   ensureSelectedIds();
+  clearUpgradeGuardExpired();
+  syncUpgradeGuardTicker();
 
   const source = byId(state.data.inventory, state.selectedOwnId);
   const target = byId(state.data.targets, state.selectedTargetId);
   const chance = calculateChance(source, target);
+  const secureBackendReady = Boolean(UPGRADE_API_BASE);
+  const walletReady = Boolean(state.tonAddress);
+  const penaltyLeftMs = getUpgradePenaltyRemainingMs();
+  const cooldownLeftMs = getUpgradeCooldownRemainingMs();
+  const hasGuardBlock = !state.isSpinning && (penaltyLeftMs > 0 || cooldownLeftMs > 0);
 
   const chanceRing = document.getElementById("chance-ring");
   const note = document.getElementById("math-note");
   const button = document.getElementById("upgrade-btn");
+  if (!chanceRing || !note || !button) return;
 
-  if (!source || !target) {
+  button.textContent = getUpgradeButtonLabel();
+
+  if (SECURE_UPGRADE_REQUIRED && !secureBackendReady) {
+    chanceRing.classList.add("is-empty");
+    animateChanceTo(0, 360);
+    note.textContent = t("note_secure_backend_required");
+    button.disabled = true;
+    button.textContent = getUpgradeButtonLabel();
+    applyChanceOutcomeVisual();
+    return;
+  }
+
+  if (!walletReady) {
+    chanceRing.classList.add("is-empty");
+    animateChanceTo(0, 360);
+    note.textContent = t("note_secure_wallet_required");
+    button.disabled = true;
+    button.textContent = getUpgradeButtonLabel();
+    applyChanceOutcomeVisual();
+    return;
+  }
+
+  if (!source) {
     chanceRing.classList.add("is-empty");
     animateChanceTo(0, 460);
     note.textContent = t("note_select_nft");
     button.disabled = true;
+    button.textContent = getUpgradeButtonLabel();
+    applyChanceOutcomeVisual();
+    return;
+  }
+
+  if (!target) {
+    const maxTargetValue = getMaxTargetValueForSource(source);
+    const hasEligibleTargets = getEligibleTargetsForSource(source, state.data.targets).length > 0;
+    chanceRing.classList.add("is-empty");
+    animateChanceTo(0, 460);
+    note.textContent = hasEligibleTargets
+      ? t("note_select_nft")
+      : formatTargetLimitNote(maxTargetValue);
+    button.disabled = true;
+    button.textContent = getUpgradeButtonLabel();
+    applyChanceOutcomeVisual();
+    return;
+  }
+
+  if (!isTargetWithinUpgradeLimit(source, target)) {
+    const maxTargetValue = getMaxTargetValueForSource(source);
+    chanceRing.classList.add("is-empty");
+    animateChanceTo(0, 380);
+    note.textContent = formatTargetLimitNote(maxTargetValue);
+    button.disabled = true;
+    button.textContent = getUpgradeButtonLabel();
     applyChanceOutcomeVisual();
     return;
   }
 
   chanceRing.classList.remove("is-empty");
   animateChanceTo(chance, state.isSpinning ? 240 : 680);
-  note.textContent = `${source.name} -> ${target.name}`;
-  button.disabled = state.isSpinning;
+  if (!state.isSpinning && penaltyLeftMs > 0) {
+    note.textContent = t("note_upgrade_penalty", { seconds: Math.max(1, Math.ceil(penaltyLeftMs / 1000)) });
+  } else if (!state.isSpinning && cooldownLeftMs > 0) {
+    note.textContent = t("note_upgrade_cooldown", { seconds: Math.max(1, Math.ceil(cooldownLeftMs / 1000)) });
+  } else {
+    note.textContent = `${source.name} -> ${target.name}`;
+  }
+
+  button.disabled = state.isSpinning || state.upgradeFlow.waitingQueue || hasGuardBlock;
+  button.textContent = getUpgradeButtonLabel();
   applyChanceOutcomeVisual();
 }
 
@@ -2639,12 +3790,13 @@ function spinArrowToResult(targetAngle) {
   });
 }
 
-function applyUpgradeResult(success, source, target, landedAngle, chance, resultNode) {
+function applyUpgradeResult(success, source, target, landedAngle, chance, resultNode, options = {}) {
+  const rewardMode = String(options.rewardMode ?? "nft").trim().toLowerCase();
   state.data.inventory = state.data.inventory.filter((nft) => nft.id !== source.id);
   state.data.profileInventory = state.data.profileInventory.filter((nft) => nft.id !== source.id);
   state.data.stats.upgradesTotal += 1;
 
-  if (success) {
+  if (success && rewardMode !== "ton" && target) {
     state.data.stats.upgradesWon += 1;
     const minted = {
       ...target,
@@ -2653,40 +3805,128 @@ function applyUpgradeResult(success, source, target, landedAngle, chance, result
     state.data.inventory.unshift(minted);
     state.data.profileInventory.unshift(minted);
     state.data.dropped.unshift(minted);
+  } else if (success && rewardMode === "ton") {
+    state.data.stats.upgradesWon += 1;
   }
 
   state.upgradeOutcome = success ? "win" : "lose";
   applyChanceOutcomeVisual();
-  resultNode.classList.remove("success", "fail");
+  resultNode.classList.remove("success", "fail", "queued");
   resultNode.textContent = "";
 }
 
 function setupUpgradeFlow() {
   const actionButton = document.getElementById("upgrade-btn");
   const result = document.getElementById("upgrade-result");
+  if (!actionButton || !result) return;
 
   actionButton.addEventListener("click", async () => {
     if (state.isSpinning) return;
 
+    const penaltyLeftMs = getUpgradePenaltyRemainingMs();
+    if (penaltyLeftMs > 0) {
+      result.classList.remove("success", "queued");
+      result.classList.add("fail");
+      result.textContent = t("result_penalty", { seconds: Math.max(1, Math.ceil(penaltyLeftMs / 1000)) });
+      refreshUpgradeState();
+      return;
+    }
+
+    const cooldownLeftMs = getUpgradeCooldownRemainingMs();
+    if (cooldownLeftMs > 0) {
+      result.classList.remove("success", "queued");
+      result.classList.add("fail");
+      result.textContent = t("result_cooldown", { seconds: Math.max(1, Math.ceil(cooldownLeftMs / 1000)) });
+      refreshUpgradeState();
+      return;
+    }
+
     const source = byId(state.data.inventory, state.selectedOwnId);
     const target = byId(state.data.targets, state.selectedTargetId);
     if (!source || !target) return;
+    if (!isTargetWithinUpgradeLimit(source, target)) {
+      const maxTargetValue = getMaxTargetValueForSource(source);
+      result.classList.remove("success", "queued");
+      result.classList.add("fail");
+      result.textContent = formatTargetLimitError(maxTargetValue);
+      refreshUpgradeState();
+      return;
+    }
 
     const chance = calculateChance(source, target);
+    armUpgradeCooldown(UPGRADE_COOLDOWN_MS);
     state.isSpinning = true;
+    state.upgradeFlow.waitingQueue = false;
     state.upgradeOutcome = null;
     applyChanceOutcomeVisual();
 
     actionButton.disabled = true;
-    actionButton.textContent = t("button_upgrade_spin");
-    result.classList.remove("success", "fail");
+    actionButton.textContent = getUpgradeButtonLabel();
+    result.classList.remove("success", "fail", "queued");
     result.textContent = "";
 
     try {
-      const fairRoll = await getFairRoll(chance);
+      let fairRoll = null;
+      if (UPGRADE_API_BASE) {
+        fairRoll = await resolveUpgradeViaBackend({
+          source,
+          target,
+          chance,
+          onQueueUpdate: (queueState) => {
+            state.upgradeFlow.waitingQueue = Boolean(queueState?.queued);
+            actionButton.textContent = getUpgradeButtonLabel();
+
+            if (!state.upgradeFlow.waitingQueue) {
+              result.classList.remove("queued");
+              result.textContent = "";
+              return;
+            }
+
+            const waitMs = Number.isFinite(toNumber(queueState?.etaMs, NaN))
+              ? toNumber(queueState.etaMs, UPGRADE_QUEUE_POLL_MS)
+              : toNumber(queueState?.waitMs, UPGRADE_QUEUE_POLL_MS);
+            const seconds = Math.max(1, Math.ceil(Math.max(0, waitMs) / 1000));
+            const position = toNumber(queueState?.position, NaN);
+
+            result.classList.remove("success", "fail");
+            result.classList.add("queued");
+            result.textContent = Number.isFinite(position) && position > 0
+              ? t("result_queue_wait_pos", { position: Math.floor(position), seconds })
+              : t("result_queue_wait", { seconds });
+          },
+        });
+        if (!fairRoll) {
+          throw new Error("Upgrade backend rejected or unavailable");
+        }
+      } else if (!SECURE_UPGRADE_REQUIRED) {
+        fairRoll = await getFairRoll(chance);
+      } else {
+        throw new Error("Security: secure backend required");
+      }
+
+      state.upgradeFlow.waitingQueue = false;
+      actionButton.textContent = getUpgradeButtonLabel();
+      result.classList.remove("queued");
+      result.textContent = "";
+
       const spinResult = await spinArrowToResult(fairRoll.targetAngle);
-      applyUpgradeResult(fairRoll.success, source, target, spinResult.landed, chance, result);
+      const rewardMode = String(fairRoll.rewardMode ?? "nft").trim().toLowerCase();
+      const rewardTarget = rewardMode === "ton" ? null : (fairRoll.targetNft || target);
+      applyUpgradeResult(
+        fairRoll.success,
+        source,
+        rewardTarget,
+        spinResult.landed,
+        chance,
+        result,
+        { rewardMode },
+      );
       recordAnalytics("upgradeAttempts");
+
+      const payoutTon = toNumber(fairRoll.payoutTon, NaN);
+      const targetName = rewardMode === "ton" && fairRoll.success
+        ? `${t("payout_ton_label")} ${Number.isFinite(payoutTon) ? formatTon(payoutTon) : ""}`.trim()
+        : (rewardTarget?.name || target.name);
 
       pushHistoryEntry({
         id: `h-${Date.now()}`,
@@ -2695,11 +3935,11 @@ function setupUpgradeFlow() {
         chance,
         landed: spinResult.landed,
         sourceName: source.name,
-        targetName: target.name,
-        commitment: fairRoll.commitment,
-        serverSeed: fairRoll.serverSeed,
-        digest: fairRoll.digest,
-        nonce: fairRoll.nonce,
+        targetName,
+        commitment: fairRoll.commitment || state.fair.commitment,
+        serverSeed: fairRoll.serverSeed || state.fair.serverSeed,
+        digest: fairRoll.digest || "",
+        nonce: toNumber(fairRoll.nonce, state.fair.nonce),
       });
 
       if (fairRoll.success) {
@@ -2708,16 +3948,25 @@ function setupUpgradeFlow() {
         recordAnalytics("upgradeLosses");
       }
 
-      await rotateFairState();
+      if (!UPGRADE_API_BASE && !SECURE_UPGRADE_REQUIRED) {
+        await rotateFairState();
+      }
     } catch (error) {
       console.error("Upgrade flow error:", error);
+      const errorCode = normalizeUpgradeErrorCode(error);
+      if (errorCode === "offer_timeout" || errorCode === "offer_rejected") {
+        armUpgradePenalty(UPGRADE_DECLINE_PENALTY_MS);
+      }
+
       state.upgradeOutcome = null;
       applyChanceOutcomeVisual();
-      result.classList.remove("success", "fail");
-      result.textContent = "";
+      result.classList.remove("success", "fail", "queued");
+      result.classList.add("fail");
+      result.textContent = getUpgradeErrorMessage(error);
     } finally {
+      state.upgradeFlow.waitingQueue = false;
       state.isSpinning = false;
-      actionButton.textContent = t("button_upgrade_start");
+      actionButton.textContent = getUpgradeButtonLabel();
       renderAll();
     }
   });
@@ -2794,6 +4043,7 @@ function renderAll() {
   renderProfileGrid("dropped-nft-grid", "dropped-empty", state.data.dropped);
   refreshProfileStats();
   setupProfileTabs();
+  scheduleLayoutAnchors();
 }
 
 function setAvatar(container, user) {
@@ -2918,6 +4168,8 @@ function setupTonConnect() {
   const walletShort = document.getElementById("wallet-short");
   const walletBubble = document.getElementById("wallet-bubble");
   const walletBubbleBalance = document.getElementById("wallet-bubble-balance");
+  const walletMenu = document.getElementById("wallet-menu");
+  const walletDisconnect = document.getElementById("wallet-disconnect-btn");
   const appShell = document.getElementById("app-shell");
   let balanceRefreshTimer = null;
   let balanceRequestToken = 0;
@@ -2952,9 +4204,25 @@ function setupTonConnect() {
     }
   };
 
+  const closeWalletMenu = () => {
+    if (!walletMenu) return;
+    walletMenu.classList.add("hidden");
+    walletBubble?.setAttribute("aria-expanded", "false");
+  };
+
+  const toggleWalletMenu = () => {
+    if (!walletMenu || walletBubble?.classList.contains("hidden")) return;
+    const open = walletMenu.classList.contains("hidden");
+    walletMenu.classList.toggle("hidden", !open);
+    walletBubble?.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) scheduleLayoutAnchors();
+  };
+
   const setBubbleState = (connected) => {
     walletBubble.classList.toggle("hidden", !connected);
     appShell.classList.toggle("has-wallet", connected);
+    if (!connected) closeWalletMenu();
+    scheduleLayoutAnchors();
   };
 
   const refreshWalletLocale = () => {
@@ -2963,6 +4231,9 @@ function setupTonConnect() {
     if (state.walletUi.balanceLoading) {
       walletBubbleBalance.textContent = t("wallet_balance_loading");
     }
+    if (walletDisconnect) walletDisconnect.textContent = t("wallet_disconnect");
+    if (walletMenu) walletMenu.setAttribute("aria-label", t("wallet_actions_aria"));
+    if (walletBubble) walletBubble.setAttribute("aria-label", t("wallet_actions_aria"));
   };
 
   state.refreshWalletLocale = refreshWalletLocale;
@@ -3013,6 +4284,18 @@ function setupTonConnect() {
       return null;
     }
 
+    let preferredTargets = safeArray(marketData.targets);
+    try {
+      const bankTargets = await fetchBankWalletTargets();
+      if (token !== nftRequestToken) return null;
+      if (bankTargets.length > 0) {
+        preferredTargets = bankTargets;
+      }
+    } catch (error) {
+      console.warn("Bank targets loading failed:", error);
+    }
+
+    marketData.targets = preferredTargets;
     applyWalletMarketData(marketData);
 
     if (marketData.profileInventory.length === 0) {
@@ -3035,11 +4318,36 @@ function setupTonConnect() {
     }, 90000);
   };
 
+  const loadTelegramGiftsOnly = async () => {
+    const marketData = await fetchTelegramOnlyMarketData();
+    if (!marketData) return;
+
+    let bankTargets = [];
+    try {
+      bankTargets = await fetchBankWalletTargets();
+    } catch (error) {
+      console.warn("Bank targets loading failed:", error);
+    }
+
+    state.data.profileInventory = mergeUniqueNfts(state.data.profileInventory, marketData.profileInventory);
+    state.data.inventory = mergeUniqueNfts(state.data.inventory, marketData.inventory);
+    if (bankTargets.length > 0) {
+      state.data.targets = bankTargets;
+    }
+    ensureSelectedIds();
+    renderAll();
+  };
+
+  state.refreshTelegramGifts = async () => {
+    await loadTelegramGiftsOnly();
+  };
+
   if (!window.TON_CONNECT_UI?.TonConnectUI) {
     setWalletShort("wallet_tonconnect_missing");
     setWalletButtonKey("wallet_connect");
     connectButton.disabled = true;
     setBubbleState(false);
+    void loadTelegramGiftsOnly();
     return;
   }
 
@@ -3096,8 +4404,10 @@ function setupTonConnect() {
       setWalletShort("wallet_not_connected");
       void loadAppData().then(() => {
         renderAll();
+        void loadTelegramGiftsOnly();
       });
     }
+    scheduleLayoutAnchors();
   };
 
   paintConnectionState(state.tonConnectUI.wallet);
@@ -3115,6 +4425,51 @@ function setupTonConnect() {
       setWalletShort("wallet_connect_failed");
     }
   });
+
+  if (walletBubble) {
+    walletBubble.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleWalletMenu();
+    });
+
+    walletBubble.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      toggleWalletMenu();
+    });
+  }
+
+  if (walletDisconnect) {
+    walletDisconnect.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeWalletMenu();
+      if (!state.tonConnectUI) return;
+      try {
+        await state.tonConnectUI.disconnect();
+      } catch (error) {
+        console.error("TonConnect disconnect error:", error);
+      }
+    });
+  }
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!walletMenu || walletMenu.classList.contains("hidden")) return;
+    if (walletMenu.contains(target) || walletBubble?.contains(target)) return;
+    closeWalletMenu();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeWalletMenu();
+    }
+  });
+
+  refreshWalletLocale();
+  closeWalletMenu();
+  scheduleLayoutAnchors();
 }
 
 async function bootstrap() {
@@ -3137,6 +4492,7 @@ async function bootstrap() {
   renderAll();
   setNetworkStatus(state.network.online ? "ready" : "offline", state.network.online ? "network_done" : "network_offline");
   setupTonConnect();
+  scheduleLayoutAnchors();
 }
 
 bootstrap();
