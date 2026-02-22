@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-41";
+const APP_VERSION = "2026-02-22-43";
 
 const tabMeta = {
   tasks: {
@@ -33,7 +33,7 @@ const tierWeight = {
 
 const fallbackUser = {
   id: null,
-  first_name: "Гость",
+  first_name: "",
   last_name: "",
   username: "guest",
   photo_url: "",
@@ -50,10 +50,355 @@ const HISTORY_LIMIT = 60;
 const RENDER_CHUNK_SIZE = 16;
 const STALE_MS = 120000;
 
+const DEFAULT_LOCALE = "ru";
+
+const LOCALE_OPTIONS = [
+  {
+    code: "ru",
+    short: "RU",
+    flagSvg: `
+      <svg viewBox="0 0 24 16" aria-hidden="true" focusable="false">
+        <rect width="24" height="16" rx="3" fill="#fff"/>
+        <rect y="5.33" width="24" height="5.34" fill="#2f67d8"/>
+        <rect y="10.66" width="24" height="5.34" fill="#d84444"/>
+      </svg>
+    `,
+    tokens: ["ru", "russian", "russia", "русский", "россия"],
+  },
+  {
+    code: "en",
+    short: "EN",
+    flagSvg: `
+      <svg viewBox="0 0 24 16" aria-hidden="true" focusable="false">
+        <rect width="24" height="16" rx="3" fill="#1f4fa6"/>
+        <path d="M0 0 24 16M24 0 0 16" stroke="#fff" stroke-width="3"/>
+        <path d="M0 0 24 16M24 0 0 16" stroke="#d73d3d" stroke-width="1.4"/>
+        <path d="M12 0v16M0 8h24" stroke="#fff" stroke-width="5"/>
+        <path d="M12 0v16M0 8h24" stroke="#d73d3d" stroke-width="2.2"/>
+      </svg>
+    `,
+    tokens: ["en", "english", "england", "britain", "united kingdom", "английский"],
+  },
+  {
+    code: "uk",
+    short: "UK",
+    flagSvg: `
+      <svg viewBox="0 0 24 16" aria-hidden="true" focusable="false">
+        <rect width="24" height="8" rx="3" fill="#2f8bff"/>
+        <rect y="8" width="24" height="8" fill="#ffd447"/>
+      </svg>
+    `,
+    tokens: ["uk", "ua", "ukrainian", "ukraine", "українська", "украина"],
+  },
+];
+
+const SUPPORTED_LOCALES = LOCALE_OPTIONS.map((item) => item.code);
+
+const TRANSLATIONS = {
+  ru: {
+    app_title: "UPNFT Mini App",
+    copy_done: "Скопировано",
+    copy_hint: "Нажмите, чтобы скопировать",
+    copy_username_title: "Нажми, чтобы скопировать username",
+    copy_id_title: "Нажми, чтобы скопировать ID",
+    network_idle: "Ожидание",
+    network_syncing: "Синхронизация",
+    network_ready: "Данные актуальны",
+    network_stale: "Данные устарели",
+    network_offline: "Нет сети",
+    network_error: "Ошибка сети",
+    network_restored: "Сеть восстановлена",
+    network_done: "Готово",
+    network_status: "Статус сети",
+    analytics_launches: "Запусков",
+    analytics_spins: "Круток",
+    analytics_conversion: "Конверсия",
+    onboarding_start_title: "Старт",
+    onboarding_start_note: "Подключи TON Wallet, чтобы загрузить NFT и рыночные цели.",
+    onboarding_wallet_title: "Кошелек подключен",
+    onboarding_wallet_note: "NFT пока не найдены. Проверь кошелек и обнови загрузку.",
+    onboarding_prices_title: "Нужны рыночные цены",
+    onboarding_prices_note: "NFT есть, но для них пока нет TON-оценки. Попробуй обновить позже.",
+    onboarding_targets_title: "Нет рыночных целей",
+    onboarding_targets_note: "Для выбранных коллекций не найдено доступных целей на рынке.",
+    onboarding_connect: "Подключить",
+    onboarding_refresh: "Обновить NFT",
+    fair_label: "Честный рандом",
+    fair_copy: "Копировать",
+    chance_probability: "Вероятность",
+    note_select_nft: "Выбери NFT",
+    button_upgrade_start: "Запустить апгрейд",
+    button_upgrade_spin: "Крутим...",
+    my_nft_title: "Мои NFT",
+    history_title: "История апгрейдов",
+    history_clear: "Очистить",
+    history_empty: "Пока нет круток.",
+    history_win: "WIN",
+    history_loss: "LOSE",
+    history_meta: "{time} • {chance}% • n{nonce}",
+    history_fair: "hash {hash} • seed {seed}",
+    tasks_empty: "Нет активных заданий.",
+    cases_empty: "Нет кейсов для текущего уровня.",
+    bonuses_empty: "Нет активных бонусов.",
+    search_target_placeholder: "Поиск цели",
+    search_own_placeholder: "Поиск NFT",
+    sort_price_low: "Цена: дешевые",
+    sort_price_high: "Цена: дорогие",
+    sort_name_asc: "Имя: A-Z",
+    sort_name_desc: "Имя: Z-A",
+    target_empty_unavailable: "Рыночные цели не найдены.",
+    target_empty_filter: "Нет результатов по фильтру.",
+    own_empty_no_price: "Нет NFT с рыночной TON-ценой.",
+    own_empty_filter: "Нет результатов по фильтру.",
+    own_empty_not_loaded: "NFT не загружены.",
+    nft_status_market: "Маркет",
+    nft_status_wallet: "Кошелек",
+    task_status_active: "Активно",
+    result_win: "Выигрыш",
+    result_loss: "Проигрыш",
+    result_error: "Ошибка апгрейда",
+    guest_name: "Гость",
+    avatar_alt: "Аватар пользователя",
+    profile_stat_nft: "NFT",
+    profile_stat_upgrades: "Апгрейдов",
+    profile_stat_winrate: "Winrate",
+    profile_tab_my: "Мои NFT",
+    profile_tab_dropped: "Выбитые NFT",
+    profile_my_empty: "NFT пока нет.",
+    profile_dropped_empty: "Выбитых NFT пока нет.",
+    wallet_connect: "Подключить кошелек",
+    wallet_not_connected: "Кошелек не подключен",
+    wallet_balance_loading: "Загрузка...",
+    wallet_syncing_nft: "Синхронизация NFT...",
+    wallet_nft_load_error: "Ошибка загрузки NFT",
+    wallet_no_nft: "В кошельке нет NFT",
+    wallet_no_prices: "NFT загружены, цены TON не найдены",
+    wallet_nft_count: "NFT: {count}",
+    wallet_tonconnect_missing: "TonConnect недоступен",
+    wallet_tonconnect_init_error: "Ошибка инициализации TON Connect",
+    wallet_connect_failed: "Не удалось подключить кошелек",
+    nav_label: "Навигация",
+    nav_tasks: "Задания",
+    nav_upgrades: "Апгрейды",
+    nav_cases: "Кейсы",
+    nav_bonuses: "Бонусы",
+    nav_profile: "Вы",
+    locale_title: "Язык",
+    locale_search_placeholder: "Поиск языка или страны",
+    locale_select_aria: "Выбрать язык",
+    locale_empty: "Ничего не найдено",
+    lang_ru_name: "Русский",
+    lang_ru_country: "Россия",
+    lang_en_name: "English",
+    lang_en_country: "United Kingdom",
+    lang_uk_name: "Українська",
+    lang_uk_country: "Україна",
+  },
+  en: {
+    app_title: "UPNFT Mini App",
+    copy_done: "Copied",
+    copy_hint: "Tap to copy",
+    copy_username_title: "Tap to copy username",
+    copy_id_title: "Tap to copy ID",
+    network_idle: "Idle",
+    network_syncing: "Syncing",
+    network_ready: "Data is up to date",
+    network_stale: "Data is stale",
+    network_offline: "Offline",
+    network_error: "Network error",
+    network_restored: "Network restored",
+    network_done: "Ready",
+    network_status: "Network status",
+    analytics_launches: "Launches",
+    analytics_spins: "Spins",
+    analytics_conversion: "Conversion",
+    onboarding_start_title: "Start",
+    onboarding_start_note: "Connect TON Wallet to load NFT and market targets.",
+    onboarding_wallet_title: "Wallet connected",
+    onboarding_wallet_note: "No NFT found yet. Check your wallet and refresh.",
+    onboarding_prices_title: "Market prices required",
+    onboarding_prices_note: "NFT loaded, but TON market prices are not available yet. Try again later.",
+    onboarding_targets_title: "No market targets",
+    onboarding_targets_note: "No available targets were found for selected collections.",
+    onboarding_connect: "Connect",
+    onboarding_refresh: "Refresh NFT",
+    fair_label: "Provably fair",
+    fair_copy: "Copy",
+    chance_probability: "Probability",
+    note_select_nft: "Choose NFT",
+    button_upgrade_start: "Start upgrade",
+    button_upgrade_spin: "Spinning...",
+    my_nft_title: "My NFT",
+    history_title: "Upgrade history",
+    history_clear: "Clear",
+    history_empty: "No spins yet.",
+    history_win: "WIN",
+    history_loss: "LOSE",
+    history_meta: "{time} • {chance}% • n{nonce}",
+    history_fair: "hash {hash} • seed {seed}",
+    tasks_empty: "No active tasks.",
+    cases_empty: "No cases available for your current level.",
+    bonuses_empty: "No active bonuses.",
+    search_target_placeholder: "Search target",
+    search_own_placeholder: "Search NFT",
+    sort_price_low: "Price: low first",
+    sort_price_high: "Price: high first",
+    sort_name_asc: "Name: A-Z",
+    sort_name_desc: "Name: Z-A",
+    target_empty_unavailable: "No market targets found.",
+    target_empty_filter: "No results for current filter.",
+    own_empty_no_price: "No NFT with TON market price.",
+    own_empty_filter: "No results for current filter.",
+    own_empty_not_loaded: "NFT not loaded.",
+    nft_status_market: "Market",
+    nft_status_wallet: "Wallet",
+    task_status_active: "Active",
+    result_win: "Win",
+    result_loss: "Lose",
+    result_error: "Upgrade error",
+    guest_name: "Guest",
+    avatar_alt: "User avatar",
+    profile_stat_nft: "NFT",
+    profile_stat_upgrades: "Upgrades",
+    profile_stat_winrate: "Winrate",
+    profile_tab_my: "My NFT",
+    profile_tab_dropped: "Dropped NFT",
+    profile_my_empty: "No NFT yet.",
+    profile_dropped_empty: "No dropped NFT yet.",
+    wallet_connect: "Connect wallet",
+    wallet_not_connected: "Wallet not connected",
+    wallet_balance_loading: "Loading...",
+    wallet_syncing_nft: "Syncing NFT...",
+    wallet_nft_load_error: "NFT loading error",
+    wallet_no_nft: "No NFT in wallet",
+    wallet_no_prices: "NFT loaded, TON prices not found",
+    wallet_nft_count: "NFT: {count}",
+    wallet_tonconnect_missing: "TonConnect is unavailable",
+    wallet_tonconnect_init_error: "TON Connect init error",
+    wallet_connect_failed: "Wallet connection failed",
+    nav_label: "Navigation",
+    nav_tasks: "Tasks",
+    nav_upgrades: "Upgrades",
+    nav_cases: "Cases",
+    nav_bonuses: "Bonuses",
+    nav_profile: "You",
+    locale_title: "Language",
+    locale_search_placeholder: "Search language or country",
+    locale_select_aria: "Select language",
+    locale_empty: "Nothing found",
+    lang_ru_name: "Russian",
+    lang_ru_country: "Russia",
+    lang_en_name: "English",
+    lang_en_country: "United Kingdom",
+    lang_uk_name: "Ukrainian",
+    lang_uk_country: "Ukraine",
+  },
+  uk: {
+    app_title: "UPNFT Mini App",
+    copy_done: "Скопійовано",
+    copy_hint: "Натисни, щоб скопіювати",
+    copy_username_title: "Натисни, щоб скопіювати username",
+    copy_id_title: "Натисни, щоб скопіювати ID",
+    network_idle: "Очікування",
+    network_syncing: "Синхронізація",
+    network_ready: "Дані актуальні",
+    network_stale: "Дані застаріли",
+    network_offline: "Немає мережі",
+    network_error: "Помилка мережі",
+    network_restored: "Мережу відновлено",
+    network_done: "Готово",
+    network_status: "Статус мережі",
+    analytics_launches: "Запусків",
+    analytics_spins: "Прокруток",
+    analytics_conversion: "Конверсія",
+    onboarding_start_title: "Старт",
+    onboarding_start_note: "Підключи TON Wallet, щоб завантажити NFT і ринкові цілі.",
+    onboarding_wallet_title: "Гаманець підключено",
+    onboarding_wallet_note: "NFT поки не знайдено. Перевір гаманець і онови.",
+    onboarding_prices_title: "Потрібні ринкові ціни",
+    onboarding_prices_note: "NFT є, але для них поки немає TON-оцінки. Спробуй пізніше.",
+    onboarding_targets_title: "Немає ринкових цілей",
+    onboarding_targets_note: "Для вибраних колекцій не знайдено доступних цілей.",
+    onboarding_connect: "Підключити",
+    onboarding_refresh: "Оновити NFT",
+    fair_label: "Чесний рандом",
+    fair_copy: "Копіювати",
+    chance_probability: "Ймовірність",
+    note_select_nft: "Обери NFT",
+    button_upgrade_start: "Запустити апгрейд",
+    button_upgrade_spin: "Крутимо...",
+    my_nft_title: "Мої NFT",
+    history_title: "Історія апгрейдів",
+    history_clear: "Очистити",
+    history_empty: "Поки немає прокруток.",
+    history_win: "WIN",
+    history_loss: "LOSE",
+    history_meta: "{time} • {chance}% • n{nonce}",
+    history_fair: "hash {hash} • seed {seed}",
+    tasks_empty: "Немає активних завдань.",
+    cases_empty: "Немає кейсів для поточного рівня.",
+    bonuses_empty: "Немає активних бонусів.",
+    search_target_placeholder: "Пошук цілі",
+    search_own_placeholder: "Пошук NFT",
+    sort_price_low: "Ціна: дешевші",
+    sort_price_high: "Ціна: дорожчі",
+    sort_name_asc: "Ім'я: A-Z",
+    sort_name_desc: "Ім'я: Z-A",
+    target_empty_unavailable: "Ринкові цілі не знайдено.",
+    target_empty_filter: "Немає результатів за фільтром.",
+    own_empty_no_price: "Немає NFT з ринковою TON-ціною.",
+    own_empty_filter: "Немає результатів за фільтром.",
+    own_empty_not_loaded: "NFT не завантажені.",
+    nft_status_market: "Маркет",
+    nft_status_wallet: "Гаманець",
+    task_status_active: "Активно",
+    result_win: "Виграш",
+    result_loss: "Програш",
+    result_error: "Помилка апгрейда",
+    guest_name: "Гість",
+    avatar_alt: "Аватар користувача",
+    profile_stat_nft: "NFT",
+    profile_stat_upgrades: "Апгрейдів",
+    profile_stat_winrate: "Winrate",
+    profile_tab_my: "Мої NFT",
+    profile_tab_dropped: "Вибиті NFT",
+    profile_my_empty: "NFT поки немає.",
+    profile_dropped_empty: "Вибитих NFT поки немає.",
+    wallet_connect: "Підключити гаманець",
+    wallet_not_connected: "Гаманець не підключено",
+    wallet_balance_loading: "Завантаження...",
+    wallet_syncing_nft: "Синхронізація NFT...",
+    wallet_nft_load_error: "Помилка завантаження NFT",
+    wallet_no_nft: "У гаманці немає NFT",
+    wallet_no_prices: "NFT завантажені, ціни TON не знайдено",
+    wallet_nft_count: "NFT: {count}",
+    wallet_tonconnect_missing: "TonConnect недоступний",
+    wallet_tonconnect_init_error: "Помилка ініціалізації TON Connect",
+    wallet_connect_failed: "Не вдалося підключити гаманець",
+    nav_label: "Навігація",
+    nav_tasks: "Завдання",
+    nav_upgrades: "Апгрейди",
+    nav_cases: "Кейси",
+    nav_bonuses: "Бонуси",
+    nav_profile: "Ви",
+    locale_title: "Мова",
+    locale_search_placeholder: "Пошук мови або країни",
+    locale_select_aria: "Обрати мову",
+    locale_empty: "Нічого не знайдено",
+    lang_ru_name: "Російська",
+    lang_ru_country: "Росія",
+    lang_en_name: "Англійська",
+    lang_en_country: "United Kingdom",
+    lang_uk_name: "Українська",
+    lang_uk_country: "Україна",
+  },
+};
+
 const LOCAL_KEYS = {
   history: "upnft_history_v1",
   analytics: "upnft_analytics_v1",
   fair: "upnft_fair_v1",
+  locale: "upnft_locale_v1",
 };
 
 const state = {
@@ -76,16 +421,25 @@ const state = {
   profileTab: "my",
   profileTabsBound: false,
   profileCopyBound: false,
+  localeBound: false,
   upgradesUiBound: false,
   tonConnectUI: null,
   tonAddress: "",
   refreshWalletData: null,
   openWalletModal: null,
+  refreshWalletLocale: null,
   orbitAngle: 0,
   isSpinning: false,
   spinRafId: null,
   chanceRafId: null,
   displayedChance: 0,
+  locale: DEFAULT_LOCALE,
+  localeSearch: "",
+  localeMenuOpen: false,
+  device: "mobile",
+  deviceWatchBound: false,
+  currentUser: { ...fallbackUser },
+  telegramLanguage: "",
   ui: {
     ownSearch: "",
     ownSort: "value-desc",
@@ -106,9 +460,15 @@ const state = {
   network: {
     online: navigator.onLine !== false,
     status: "idle",
-    detail: "",
+    detailKey: "",
     pending: 0,
     lastSuccessAt: 0,
+  },
+  walletUi: {
+    shortKey: "wallet_not_connected",
+    shortParams: {},
+    buttonKey: "wallet_connect",
+    balanceLoading: false,
   },
   fair: {
     nonce: 0,
@@ -119,6 +479,92 @@ const state = {
     ready: false,
   },
 };
+
+function formatI18n(template, params = {}) {
+  return String(template ?? "").replace(/\{(\w+)\}/g, (_, key) => {
+    if (params[key] === undefined || params[key] === null) return "";
+    return String(params[key]);
+  });
+}
+
+function normalizeLocaleCode(input) {
+  const raw = String(input ?? "").trim().toLowerCase().replace(/_/g, "-");
+  if (!raw) return DEFAULT_LOCALE;
+  const primary = raw.split("-")[0];
+  if (primary === "ua") return "uk";
+  if (SUPPORTED_LOCALES.includes(primary)) return primary;
+  return DEFAULT_LOCALE;
+}
+
+function getIntlLocale() {
+  if (state.locale === "uk") return "uk-UA";
+  if (state.locale === "en") return "en-GB";
+  return "ru-RU";
+}
+
+function t(key, params) {
+  const localePack = TRANSLATIONS[state.locale] || TRANSLATIONS[DEFAULT_LOCALE];
+  const fallbackPack = TRANSLATIONS[DEFAULT_LOCALE];
+  const value = localePack?.[key] ?? fallbackPack?.[key] ?? key;
+  return formatI18n(value, params);
+}
+
+function detectDeviceProfile() {
+  const tgPlatform = String(window.Telegram?.WebApp?.platform || "").toLowerCase();
+  const desktopPlatforms = new Set(["tdesktop", "macos", "web", "weba", "webk", "webz"]);
+  const mobilePlatforms = new Set(["android", "ios"]);
+  const width = Math.max(window.innerWidth || 0, document.documentElement?.clientWidth || 0);
+
+  if (desktopPlatforms.has(tgPlatform)) return "desktop";
+  if (mobilePlatforms.has(tgPlatform)) return "mobile";
+
+  const coarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches === true;
+  const touchPoints = toNumber(navigator.maxTouchPoints, 0);
+
+  if (width >= 920 && !coarsePointer && touchPoints < 2) return "desktop";
+  return "mobile";
+}
+
+function applyDeviceProfile(mode) {
+  const normalized = mode === "desktop" ? "desktop" : "mobile";
+  state.device = normalized;
+
+  const shell = document.getElementById("app-shell");
+  if (!shell) return;
+  shell.dataset.device = normalized;
+  document.body.dataset.device = normalized;
+}
+
+function refreshDeviceProfile() {
+  applyDeviceProfile(detectDeviceProfile());
+}
+
+function setupDeviceProfileWatcher() {
+  refreshDeviceProfile();
+  if (state.deviceWatchBound) return;
+
+  let timer = null;
+  const onResize = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      const prev = state.device;
+      refreshDeviceProfile();
+      if (prev !== state.device) {
+        renderAll();
+      }
+    }, 120);
+  };
+
+  window.addEventListener("resize", onResize, { passive: true });
+
+  const tg = window.Telegram?.WebApp;
+  if (tg && typeof tg.onEvent === "function") {
+    tg.onEvent("viewportChanged", onResize);
+  }
+
+  state.deviceWatchBound = true;
+}
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -226,7 +672,7 @@ function showCopyFeedback(node) {
     clearTimeout(node.__copyTimer);
   }
 
-  node.textContent = "\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u043D\u043E";
+  node.textContent = t("copy_done");
   node.classList.add("is-copied");
 
   node.__copyTimer = setTimeout(() => {
@@ -246,7 +692,7 @@ function setupProfileCopyActions() {
   copyNodes.forEach((node) => {
     node.tabIndex = 0;
     node.setAttribute("role", "button");
-    node.setAttribute("aria-label", "\u041D\u0430\u0436\u043C\u0438\u0442\u0435, \u0447\u0442\u043E\u0431\u044B \u0441\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C");
+    node.setAttribute("aria-label", t("copy_hint"));
 
     const triggerCopy = async () => {
       const value = String(node.dataset.copyValue || "").trim();
@@ -267,6 +713,278 @@ function setupProfileCopyActions() {
   });
 
   state.profileCopyBound = true;
+}
+
+function setText(selector, value) {
+  const node = document.querySelector(selector);
+  if (!node) return;
+  node.textContent = value;
+}
+
+function setPlaceholder(selector, value) {
+  const node = document.querySelector(selector);
+  if (!node) return;
+  node.setAttribute("placeholder", value);
+}
+
+function getLocaleOption(code) {
+  const normalized = normalizeLocaleCode(code);
+  return LOCALE_OPTIONS.find((item) => item.code === normalized) ?? LOCALE_OPTIONS[0];
+}
+
+function detectPreferredLocale() {
+  try {
+    const saved = localStorage.getItem(LOCAL_KEYS.locale);
+    if (saved) return normalizeLocaleCode(saved);
+  } catch {
+    // Ignore storage errors.
+  }
+
+  const tgLang = state.telegramLanguage || window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code;
+  if (tgLang) return normalizeLocaleCode(tgLang);
+
+  return normalizeLocaleCode(navigator.language || DEFAULT_LOCALE);
+}
+
+function setLocaleMenuOpen(open) {
+  state.localeMenuOpen = Boolean(open);
+  const menu = document.getElementById("locale-menu");
+  const toggle = document.getElementById("locale-toggle");
+
+  if (!state.localeMenuOpen) {
+    state.localeSearch = "";
+    const search = document.getElementById("locale-search");
+    if (search) search.value = "";
+  }
+
+  if (menu) menu.classList.toggle("hidden", !state.localeMenuOpen);
+  if (toggle) toggle.setAttribute("aria-expanded", state.localeMenuOpen ? "true" : "false");
+
+  if (!state.localeMenuOpen) {
+    renderLocalePicker();
+  }
+}
+
+function renderLocalePicker() {
+  const title = document.getElementById("locale-title");
+  const toggle = document.getElementById("locale-toggle");
+  const currentCode = document.getElementById("locale-current-code");
+  const currentFlag = document.getElementById("locale-current-flag");
+  const search = document.getElementById("locale-search");
+  const list = document.getElementById("locale-list");
+  if (!title || !toggle || !currentCode || !currentFlag || !search || !list) return;
+
+  title.textContent = t("locale_title");
+  toggle.setAttribute("aria-label", t("locale_select_aria"));
+  search.setAttribute("placeholder", t("locale_search_placeholder"));
+
+  const current = getLocaleOption(state.locale);
+  currentCode.textContent = current.short;
+  currentFlag.innerHTML = current.flagSvg;
+
+  const query = tokenize(state.localeSearch);
+  const filtered = LOCALE_OPTIONS.filter((item) => {
+    if (!query) return true;
+    const name = tokenize(t(`lang_${item.code}_name`));
+    const country = tokenize(t(`lang_${item.code}_country`));
+    const tokens = tokenize(item.tokens.join(" "));
+    return name.includes(query)
+      || country.includes(query)
+      || tokens.includes(query)
+      || item.short.toLowerCase().includes(query);
+  });
+
+  list.innerHTML = "";
+
+  if (filtered.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "locale-empty";
+    empty.textContent = t("locale_empty");
+    list.append(empty);
+    return;
+  }
+
+  filtered.forEach((item) => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = `locale-option${item.code === state.locale ? " is-active" : ""}`;
+    option.dataset.locale = item.code;
+
+    const flag = document.createElement("span");
+    flag.className = "locale-option-flag";
+    flag.innerHTML = item.flagSvg;
+
+    const textWrap = document.createElement("span");
+    textWrap.className = "locale-option-text";
+    const name = document.createElement("strong");
+    name.textContent = t(`lang_${item.code}_name`);
+    const country = document.createElement("small");
+    country.textContent = t(`lang_${item.code}_country`);
+    textWrap.append(name, country);
+
+    const code = document.createElement("span");
+    code.className = "locale-option-code";
+    code.textContent = item.short;
+
+    option.append(flag, textWrap, code);
+    option.addEventListener("click", () => {
+      setLocale(item.code);
+      setLocaleMenuOpen(false);
+    });
+    list.append(option);
+  });
+}
+
+function setupLocalePicker() {
+  if (state.localeBound) return;
+  const picker = document.getElementById("locale-picker");
+  const menu = document.getElementById("locale-menu");
+  const toggle = document.getElementById("locale-toggle");
+  const search = document.getElementById("locale-search");
+  if (!picker || !menu || !toggle || !search) return;
+
+  setLocaleMenuOpen(false);
+
+  toggle.addEventListener("click", () => {
+    const next = !state.localeMenuOpen;
+    setLocaleMenuOpen(next);
+    if (next) {
+      search.focus();
+      search.select();
+    }
+  });
+
+  search.addEventListener("input", (event) => {
+    state.localeSearch = event.target.value || "";
+    renderLocalePicker();
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!state.localeMenuOpen) return;
+    if (picker.contains(event.target)) return;
+    setLocaleMenuOpen(false);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (!state.localeMenuOpen) return;
+    setLocaleMenuOpen(false);
+  });
+
+  state.localeBound = true;
+}
+
+function applyStaticLocalization() {
+  document.documentElement.lang = state.locale;
+  document.title = t("app_title");
+
+  setText("#tasks-empty", t("tasks_empty"));
+  setText("#cases-empty", t("cases_empty"));
+  setText("#bonuses-empty", t("bonuses_empty"));
+  setText("#target-empty", t("target_empty_unavailable"));
+  setText("#own-empty", t("own_empty_not_loaded"));
+  setText("#history-empty", t("history_empty"));
+  setText(".fair-label", t("fair_label"));
+  setText("#copy-fair-btn", t("fair_copy"));
+  setText("#chance-ring .chance-core small", t("chance_probability"));
+  setText("#math-note", t("note_select_nft"));
+  setText(".upgrade-screen .block-title", t("my_nft_title"));
+  setText(".history-head h3", t("history_title"));
+  setText("#history-clear-btn", t("history_clear"));
+  setText("#upgrade-btn", state.isSpinning ? t("button_upgrade_spin") : t("button_upgrade_start"));
+  setText("#onboarding-connect", t("onboarding_connect"));
+  setText("#onboarding-refresh", t("onboarding_refresh"));
+
+  const fairCopyBtn = document.getElementById("copy-fair-btn");
+  if (fairCopyBtn) {
+    fairCopyBtn.dataset.copyLabel = t("fair_copy");
+  }
+
+  setPlaceholder("#target-search", t("search_target_placeholder"));
+  setPlaceholder("#own-search", t("search_own_placeholder"));
+  setText("#target-sort option[value='value-asc']", t("sort_price_low"));
+  setText("#target-sort option[value='value-desc']", t("sort_price_high"));
+  setText("#target-sort option[value='name-asc']", t("sort_name_asc"));
+  setText("#target-sort option[value='name-desc']", t("sort_name_desc"));
+  setText("#own-sort option[value='value-asc']", t("sort_price_low"));
+  setText("#own-sort option[value='value-desc']", t("sort_price_high"));
+  setText("#own-sort option[value='name-asc']", t("sort_name_asc"));
+  setText("#own-sort option[value='name-desc']", t("sort_name_desc"));
+
+  setText(".stat-row div:nth-child(1) span", t("profile_stat_nft"));
+  setText(".stat-row div:nth-child(2) span", t("profile_stat_upgrades"));
+  setText(".stat-row div:nth-child(3) span", t("profile_stat_winrate"));
+  setText(".wallet-btn-text", t("wallet_connect"));
+  if (!state.tonAddress) {
+    setText("#wallet-short", t("wallet_not_connected"));
+  }
+  setText(".profile-tab-btn[data-profile-tab='my']", t("profile_tab_my"));
+  setText(".profile-tab-btn[data-profile-tab='dropped']", t("profile_tab_dropped"));
+  setText("#my-empty", t("profile_my_empty"));
+  setText("#dropped-empty", t("profile_dropped_empty"));
+
+  const nav = document.querySelector(".bottom-nav");
+  if (nav) nav.setAttribute("aria-label", t("nav_label"));
+  setText(".nav-btn[data-tab='tasks'] > span:last-child", t("nav_tasks"));
+  setText(".nav-btn[data-tab='upgrades'] > span:last-child", t("nav_upgrades"));
+  setText(".nav-btn[data-tab='cases'] > span:last-child", t("nav_cases"));
+  setText(".nav-btn[data-tab='bonuses'] > span:last-child", t("nav_bonuses"));
+  setText(".nav-btn[data-tab='profile'] > span:last-child", t("nav_profile"));
+
+  const navTasks = document.querySelector(".nav-btn[data-tab='tasks']");
+  const navUpgrades = document.querySelector(".nav-btn[data-tab='upgrades']");
+  const navCases = document.querySelector(".nav-btn[data-tab='cases']");
+  const navBonuses = document.querySelector(".nav-btn[data-tab='bonuses']");
+  const navProfile = document.querySelector(".nav-btn[data-tab='profile']");
+  if (navTasks) navTasks.setAttribute("aria-label", t("nav_tasks"));
+  if (navUpgrades) navUpgrades.setAttribute("aria-label", t("nav_upgrades"));
+  if (navCases) navCases.setAttribute("aria-label", t("nav_cases"));
+  if (navBonuses) navBonuses.setAttribute("aria-label", t("nav_bonuses"));
+  if (navProfile) navProfile.setAttribute("aria-label", t("nav_profile"));
+
+  const handleNode = document.getElementById("profile-handle");
+  const idNode = document.getElementById("profile-id");
+  if (handleNode) handleNode.setAttribute("aria-label", t("copy_hint"));
+  if (idNode) idNode.setAttribute("aria-label", t("copy_hint"));
+
+  const localeList = document.getElementById("locale-list");
+  if (localeList) localeList.setAttribute("aria-label", t("locale_title"));
+}
+
+function setLocale(nextLocale, options = {}) {
+  const { persist = true, rerender = true } = options;
+  const normalized = normalizeLocaleCode(nextLocale);
+  state.locale = normalized;
+
+  if (persist) {
+    try {
+      localStorage.setItem(LOCAL_KEYS.locale, normalized);
+    } catch {
+      // Ignore storage errors.
+    }
+  }
+
+  applyStaticLocalization();
+  renderLocalePicker();
+  updateNetworkPill();
+
+  if (typeof state.refreshWalletLocale === "function") {
+    state.refreshWalletLocale();
+  }
+
+  if (state.currentUser) {
+    applyUserProfile(state.currentUser);
+  }
+
+  if (rerender) {
+    renderAll();
+  }
+}
+
+function setupLocalization() {
+  const locale = detectPreferredLocale();
+  setLocale(locale, { persist: false, rerender: false });
+  setupLocalePicker();
 }
 
 function nowMs() {
@@ -304,25 +1022,26 @@ function updateNetworkPill() {
   const text = document.getElementById("network-pill-text");
   if (!pill || !text) return;
 
-  const { status, detail } = state.network;
+  const { status, detailKey } = state.network;
   const fallbackMap = {
-    idle: "Ожидание",
-    syncing: "Синхронизация",
-    ready: "Данные актуальны",
-    stale: "Данные устарели",
-    offline: "Нет сети",
-    error: "Ошибка сети",
+    idle: "network_idle",
+    syncing: "network_syncing",
+    ready: "network_ready",
+    stale: "network_stale",
+    offline: "network_offline",
+    error: "network_error",
   };
-  const label = detail || fallbackMap[status] || "Статус сети";
+  const labelKey = detailKey || fallbackMap[status] || "network_status";
+  const label = t(labelKey);
 
   pill.className = `network-pill${status ? ` is-${status}` : ""}`;
   text.textContent = label;
   pill.classList.remove("hidden");
 }
 
-function setNetworkStatus(status, detail = "") {
+function setNetworkStatus(status, detailKey = "") {
   state.network.status = status;
-  state.network.detail = detail;
+  state.network.detailKey = detailKey;
   if (status === "ready") {
     state.network.lastSuccessAt = nowMs();
   }
@@ -332,9 +1051,9 @@ function setNetworkStatus(status, detail = "") {
 function markNetworkRequestStart() {
   state.network.pending += 1;
   if (state.network.online) {
-    setNetworkStatus("syncing", "Синхронизация");
+    setNetworkStatus("syncing");
   } else {
-    setNetworkStatus("offline", "Нет сети");
+    setNetworkStatus("offline");
   }
 }
 
@@ -343,32 +1062,32 @@ function markNetworkRequestEnd(ok) {
   if (state.network.pending > 0) return;
 
   if (!state.network.online) {
-    setNetworkStatus("offline", "Нет сети");
+    setNetworkStatus("offline");
     return;
   }
 
   if (ok) {
-    setNetworkStatus("ready", "Данные актуальны");
+    setNetworkStatus("ready");
     return;
   }
 
-  setNetworkStatus("error", "Ошибка сети");
+  setNetworkStatus("error");
 }
 
 function monitorNetworkFreshness() {
   window.addEventListener("online", () => {
     state.network.online = true;
-    setNetworkStatus("ready", "Сеть восстановлена");
+    setNetworkStatus("ready", "network_restored");
   });
   window.addEventListener("offline", () => {
     state.network.online = false;
-    setNetworkStatus("offline", "Нет сети");
+    setNetworkStatus("offline");
   });
 
   window.setInterval(() => {
     if (!state.network.lastSuccessAt || state.network.pending > 0 || !state.network.online) return;
     if (nowMs() - state.network.lastSuccessAt > STALE_MS) {
-      setNetworkStatus("stale", "Данные устарели");
+      setNetworkStatus("stale");
     }
   }, 15000);
 }
@@ -392,9 +1111,9 @@ function renderAnalyticsRow() {
   node.innerHTML = "";
 
   const cells = [
-    { label: "Запусков", value: String(state.analytics.launches) },
-    { label: "Круток", value: String(attempts) },
-    { label: "Конверсия", value: conversion },
+    { label: t("analytics_launches"), value: String(state.analytics.launches) },
+    { label: t("analytics_spins"), value: String(attempts) },
+    { label: t("analytics_conversion"), value: conversion },
   ];
 
   cells.forEach((cell) => {
@@ -561,16 +1280,23 @@ function renderUpgradeHistory() {
     const title = document.createElement("strong");
     title.textContent = `${item.sourceName} -> ${item.targetName}`;
     const result = document.createElement("span");
-    result.textContent = item.success ? "WIN" : "LOSE";
+    result.textContent = item.success ? t("history_win") : t("history_loss");
     top.append(title, result);
 
     const meta = document.createElement("p");
     meta.className = "history-meta";
-    meta.textContent = `${new Date(item.at).toLocaleTimeString()} • ${item.chance.toFixed(1)}% • n${item.nonce}`;
+    meta.textContent = t("history_meta", {
+      time: new Date(item.at).toLocaleTimeString(getIntlLocale()),
+      chance: item.chance.toFixed(1),
+      nonce: item.nonce,
+    });
 
     const fair = document.createElement("p");
     fair.className = "history-fair";
-    fair.textContent = `hash ${shortHash(item.commitment, 8, 8)} • seed ${shortHash(item.serverSeed, 6, 6)}`;
+    fair.textContent = t("history_fair", {
+      hash: shortHash(item.commitment, 8, 8),
+      seed: shortHash(item.serverSeed, 6, 6),
+    });
 
     row.append(top, meta, fair);
     list.append(row);
@@ -593,11 +1319,11 @@ function sortNfts(list, mode) {
     return items;
   }
   if (mode === "name-asc") {
-    items.sort((left, right) => String(left.name).localeCompare(String(right.name), "ru"));
+    items.sort((left, right) => String(left.name).localeCompare(String(right.name), getIntlLocale()));
     return items;
   }
   if (mode === "name-desc") {
-    items.sort((left, right) => String(right.name).localeCompare(String(left.name), "ru"));
+    items.sort((left, right) => String(right.name).localeCompare(String(left.name), getIntlLocale()));
     return items;
   }
   items.sort((left, right) => right.value - left.value);
@@ -743,29 +1469,31 @@ function renderOnboarding() {
 
   if (!connected) {
     visible = true;
-    titleText = "Старт";
-    noteText = "Подключи TON Wallet, чтобы загрузить NFT и рыночные цели.";
+    titleText = t("onboarding_start_title");
+    noteText = t("onboarding_start_note");
     showConnect = true;
   } else if (state.data.profileInventory.length === 0) {
     visible = true;
-    titleText = "Кошелек подключен";
-    noteText = "NFT пока не найдены. Проверь кошелек и обнови загрузку.";
+    titleText = t("onboarding_wallet_title");
+    noteText = t("onboarding_wallet_note");
     showRefresh = true;
   } else if (state.data.inventory.length === 0) {
     visible = true;
-    titleText = "Нужны рыночные цены";
-    noteText = "NFT есть, но для них пока нет TON-оценки. Попробуй обновить позже.";
+    titleText = t("onboarding_prices_title");
+    noteText = t("onboarding_prices_note");
     showRefresh = true;
   } else if (state.data.targets.length === 0) {
     visible = true;
-    titleText = "Нет рыночных целей";
-    noteText = "Для выбранных коллекций не найдено доступных целей на рынке.";
+    titleText = t("onboarding_targets_title");
+    noteText = t("onboarding_targets_note");
     showRefresh = true;
   }
 
   panel.classList.toggle("hidden", !visible);
   title.textContent = titleText;
   note.textContent = noteText;
+  connectBtn.textContent = t("onboarding_connect");
+  refreshBtn.textContent = t("onboarding_refresh");
   connectBtn.classList.toggle("hidden", !showConnect);
   refreshBtn.classList.toggle("hidden", !showRefresh);
 }
@@ -1540,7 +2268,7 @@ function createNftCardBody(nft) {
 
   const status = document.createElement("span");
   status.className = `nft-status${nft.listed ? " is-listed" : ""}`;
-  status.textContent = nft.listed ? "Маркет" : "Кошелек";
+  status.textContent = nft.listed ? t("nft_status_market") : t("nft_status_wallet");
 
   meta.append(tier, status);
   body.append(title, meta);
@@ -1575,7 +2303,7 @@ function renderTasks() {
     const title = document.createElement("strong");
     title.textContent = task.title;
     const status = document.createElement("small");
-    status.textContent = task.status || "Активно";
+    status.textContent = task.status || t("task_status_active");
     left.append(title, status);
 
     const reward = document.createElement("span");
@@ -1666,8 +2394,8 @@ function renderTargetChips() {
 
   if (emptyNode) {
     emptyNode.textContent = state.data.targets.length > 0
-      ? "Нет результатов по фильтру."
-      : "Рыночные цели не найдены.";
+      ? t("target_empty_filter")
+      : t("target_empty_unavailable");
   }
   hideElementById("target-empty", filteredTargets.length > 0);
 }
@@ -1696,11 +2424,11 @@ function renderOwnNftCards() {
 
   if (emptyNode) {
     if (state.data.profileInventory.length > 0 && state.data.inventory.length === 0) {
-      emptyNode.textContent = "Нет NFT с рыночной TON-ценой.";
+      emptyNode.textContent = t("own_empty_no_price");
     } else if (state.data.inventory.length > 0 && filteredOwn.length === 0) {
-      emptyNode.textContent = "Нет результатов по фильтру.";
+      emptyNode.textContent = t("own_empty_filter");
     } else {
-      emptyNode.textContent = "NFT не загружены.";
+      emptyNode.textContent = t("own_empty_not_loaded");
     }
   }
 
@@ -1733,7 +2461,7 @@ function refreshUpgradeState() {
   if (!source || !target) {
     chanceRing.classList.add("is-empty");
     animateChanceTo(0, 460);
-    note.textContent = "\u0412\u044b\u0431\u0435\u0440\u0438 NFT";
+    note.textContent = t("note_select_nft");
     button.disabled = true;
     return;
   }
@@ -1798,11 +2526,11 @@ function applyUpgradeResult(success, source, target, landedAngle, chance, result
   }
 
   if (success) {
-    resultNode.textContent = "Выигрыш";
+    resultNode.textContent = t("result_win");
     resultNode.classList.remove("fail");
     resultNode.classList.add("success");
   } else {
-    resultNode.textContent = "Проигрыш";
+    resultNode.textContent = t("result_loss");
     resultNode.classList.remove("success");
     resultNode.classList.add("fail");
   }
@@ -1824,7 +2552,7 @@ function setupUpgradeFlow() {
     recordAnalytics("upgradeAttempts");
 
     actionButton.disabled = true;
-    actionButton.textContent = "Крутим...";
+    actionButton.textContent = t("button_upgrade_spin");
     result.classList.remove("success", "fail");
     result.textContent = "";
 
@@ -1858,10 +2586,10 @@ function setupUpgradeFlow() {
       console.error("Upgrade flow error:", error);
       result.classList.remove("success");
       result.classList.add("fail");
-      result.textContent = "Ошибка апгрейда";
+      result.textContent = t("result_error");
     } finally {
       state.isSpinning = false;
-      actionButton.textContent = "Запустить апгрейд";
+      actionButton.textContent = t("button_upgrade_start");
       renderAll();
     }
   });
@@ -1921,6 +2649,8 @@ function setupProfileTabs() {
 }
 
 function renderAll() {
+  applyStaticLocalization();
+  renderLocalePicker();
   renderTasks();
   renderCases();
   renderBonuses();
@@ -1963,7 +2693,7 @@ function setAvatar(container, user) {
   const applyImage = (url) => {
     const img = document.createElement("img");
     img.src = url;
-    img.alt = "User avatar";
+    img.alt = t("avatar_alt");
     img.loading = "lazy";
     img.decoding = "async";
     img.referrerPolicy = "no-referrer";
@@ -1980,7 +2710,7 @@ function setAvatar(container, user) {
     video.playsInline = true;
     video.setAttribute("webkit-playsinline", "");
     video.setAttribute("playsinline", "");
-    video.setAttribute("aria-label", "User avatar");
+    video.setAttribute("aria-label", t("avatar_alt"));
     video.preload = "metadata";
     video.onerror = () => applyImage(avatarUrl);
     container.replaceChildren(video);
@@ -1992,7 +2722,7 @@ function setAvatar(container, user) {
 
 function applyUserProfile(user) {
   const fullNameRaw = [user.first_name, user.last_name].filter(Boolean).join(" ");
-  const fullName = normalizeDisplayName(fullNameRaw) || "Гость";
+  const fullName = normalizeDisplayName(fullNameRaw) || t("guest_name");
   const handle = user.username ? `@${String(user.username).trim()}` : "";
   const fullId = user?.id !== undefined && user?.id !== null ? String(user.id).trim() : "";
   const compactId = shortUserId(user.id);
@@ -2006,14 +2736,14 @@ function applyUserProfile(user) {
   handleNode.classList.toggle("hidden", !handle);
   handleNode.dataset.copyLabel = handle;
   handleNode.dataset.copyValue = handle;
-  handleNode.setAttribute("title", handle ? "\u041D\u0430\u0436\u043C\u0438, \u0447\u0442\u043E\u0431\u044B \u0441\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C username" : "");
+  handleNode.setAttribute("title", handle ? t("copy_username_title") : "");
 
   if (compactId) {
     idNode.textContent = `ID ${compactId}`;
     idNode.classList.remove("hidden");
     idNode.dataset.copyLabel = `ID ${compactId}`;
     idNode.dataset.copyValue = fullId || compactId;
-    idNode.setAttribute("title", "\u041D\u0430\u0436\u043C\u0438, \u0447\u0442\u043E\u0431\u044B \u0441\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C ID");
+    idNode.setAttribute("title", t("copy_id_title"));
   } else {
     idNode.textContent = "";
     idNode.classList.add("hidden");
@@ -2030,7 +2760,8 @@ function setupTelegramUser() {
 
   const tg = window.Telegram?.WebApp;
   if (!tg) {
-    applyUserProfile(fallbackUser);
+    state.currentUser = { ...fallbackUser };
+    applyUserProfile(state.currentUser);
     return;
   }
 
@@ -2042,10 +2773,14 @@ function setupTelegramUser() {
     if (typeof tg.disableVerticalSwipes === "function") tg.disableVerticalSwipes();
 
     const user = tg.initDataUnsafe?.user;
-    applyUserProfile(user ? { ...fallbackUser, ...user } : fallbackUser);
+    const mergedUser = user ? { ...fallbackUser, ...user } : { ...fallbackUser };
+    state.currentUser = mergedUser;
+    state.telegramLanguage = String(user?.language_code || "").trim();
+    applyUserProfile(mergedUser);
   } catch (error) {
     console.error("Telegram WebApp init error:", error);
-    applyUserProfile(fallbackUser);
+    state.currentUser = { ...fallbackUser };
+    applyUserProfile(state.currentUser);
   }
 }
 
@@ -2069,6 +2804,17 @@ function setupTonConnect() {
     connectButton.textContent = label;
   };
 
+  const setWalletButtonKey = (key) => {
+    state.walletUi.buttonKey = key;
+    setWalletButtonText(t(key));
+  };
+
+  const setWalletShort = (key, params = {}) => {
+    state.walletUi.shortKey = key;
+    state.walletUi.shortParams = params;
+    walletShort.textContent = t(key, params);
+  };
+
   const stopBalancePolling = () => {
     balanceRequestToken += 1;
     if (balanceRefreshTimer) {
@@ -2082,11 +2828,23 @@ function setupTonConnect() {
     appShell.classList.toggle("has-wallet", connected);
   };
 
+  const refreshWalletLocale = () => {
+    setWalletButtonText(t(state.walletUi.buttonKey || "wallet_connect"));
+    walletShort.textContent = t(state.walletUi.shortKey || "wallet_not_connected", state.walletUi.shortParams || {});
+    if (state.walletUi.balanceLoading) {
+      walletBubbleBalance.textContent = t("wallet_balance_loading");
+    }
+  };
+
+  state.refreshWalletLocale = refreshWalletLocale;
+
   const loadWalletBalance = async (address) => {
     const token = ++balanceRequestToken;
-    walletBubbleBalance.textContent = "Загрузка...";
+    state.walletUi.balanceLoading = true;
+    walletBubbleBalance.textContent = t("wallet_balance_loading");
     const balance = await fetchWalletTonBalance(address);
     if (token !== balanceRequestToken) return;
+    state.walletUi.balanceLoading = false;
     walletBubbleBalance.textContent = balance ? `${balance} TON` : "-- TON";
   };
 
@@ -2117,23 +2875,23 @@ function setupTonConnect() {
 
   const loadWalletNfts = async (address) => {
     const token = ++nftRequestToken;
-    walletShort.textContent = "Синхронизация NFT...";
+    setWalletShort("wallet_syncing_nft");
     const marketData = await fetchWalletMarketData(address);
     if (token !== nftRequestToken) return null;
 
     if (!marketData) {
-      walletShort.textContent = "Ошибка загрузки NFT";
+      setWalletShort("wallet_nft_load_error");
       return null;
     }
 
     applyWalletMarketData(marketData);
 
     if (marketData.profileInventory.length === 0) {
-      walletShort.textContent = "В кошельке нет NFT";
+      setWalletShort("wallet_no_nft");
     } else if (marketData.inventory.length === 0) {
-      walletShort.textContent = "NFT загружены, цены TON не найдены";
+      setWalletShort("wallet_no_prices");
     } else {
-      walletShort.textContent = `NFT: ${marketData.profileInventory.length}`;
+      setWalletShort("wallet_nft_count", { count: marketData.profileInventory.length });
       recordAnalytics("nftSyncSuccess");
     }
 
@@ -2149,7 +2907,8 @@ function setupTonConnect() {
   };
 
   if (!window.TON_CONNECT_UI?.TonConnectUI) {
-    walletShort.textContent = "TonConnect недоступен";
+    setWalletShort("wallet_tonconnect_missing");
+    setWalletButtonKey("wallet_connect");
     connectButton.disabled = true;
     setBubbleState(false);
     return;
@@ -2163,7 +2922,8 @@ function setupTonConnect() {
     });
   } catch (error) {
     console.error("TonConnect init error:", error);
-    walletShort.textContent = "Ошибка инициализации TON Connect";
+    setWalletShort("wallet_tonconnect_init_error");
+    setWalletButtonKey("wallet_connect");
     connectButton.disabled = true;
     setBubbleState(false);
     return;
@@ -2183,7 +2943,7 @@ function setupTonConnect() {
     const address = wallet?.account?.address || state.tonConnectUI?.account?.address || "";
     const connected = Boolean(address);
 
-    setWalletButtonText("Подключить кошелек");
+    setWalletButtonKey("wallet_connect");
     connectButton.classList.toggle("hidden", connected);
     connectButton.disabled = false;
     setBubbleState(connected);
@@ -2195,15 +2955,16 @@ function setupTonConnect() {
         recordAnalytics("walletConnects");
       }
 
-      walletShort.textContent = "Синхронизация NFT...";
+      setWalletShort("wallet_syncing_nft");
       startBalancePolling(address);
       startNftPolling(address);
     } else {
       state.tonAddress = "";
       stopBalancePolling();
       stopNftPolling();
+      state.walletUi.balanceLoading = false;
       walletBubbleBalance.textContent = "-- TON";
-      walletShort.textContent = "Кошелек не подключен";
+      setWalletShort("wallet_not_connected");
       void loadAppData().then(() => {
         renderAll();
       });
@@ -2222,7 +2983,7 @@ function setupTonConnect() {
       await state.openWalletModal();
     } catch (error) {
       console.error("TonConnect action error:", error);
-      walletShort.textContent = "Не удалось подключить кошелек";
+      setWalletShort("wallet_connect_failed");
     }
   });
 }
@@ -2230,11 +2991,13 @@ function setupTonConnect() {
 async function bootstrap() {
   loadPersistentData();
   recordAnalytics("launches");
-  setNetworkStatus("idle", "Ожидание");
+  setNetworkStatus("idle");
   monitorNetworkFreshness();
   await prepareFairState();
+  setupDeviceProfileWatcher();
   setupTabs();
   setupTelegramUser();
+  setupLocalization();
   setupProfileCopyActions();
   setOrbitAngle(state.orbitAngle);
   paintChance(state.displayedChance);
@@ -2243,7 +3006,7 @@ async function bootstrap() {
   renderAll();
   await loadAppData();
   renderAll();
-  setNetworkStatus(state.network.online ? "ready" : "offline", state.network.online ? "Готово" : "Нет сети");
+  setNetworkStatus(state.network.online ? "ready" : "offline", state.network.online ? "network_done" : "network_offline");
   setupTonConnect();
 }
 

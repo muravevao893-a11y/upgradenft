@@ -12,11 +12,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=2026-02-22-41">
+  <link rel="stylesheet" href="./styles.css?v=2026-02-22-43">
 
   <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
   <script defer src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-  <script defer src="./app.js?v=2026-02-22-41"></script>
+  <script defer src="./app.js?v=2026-02-22-43"></script>
 </head>
 <body>
   <main id="app-shell" class="app-shell">
@@ -50,75 +50,83 @@
 
       <section class="tab-section is-active" data-tab-section="upgrades">
         <div class="screen upgrade-screen">
-          <div class="target-block">
-            <p class="label" aria-hidden="true"></p>
-            <div class="list-controls">
-              <input id="target-search" type="search" class="control-input" placeholder="Поиск цели">
-              <select id="target-sort" class="control-select">
-                <option value="value-asc">Цена: дешевые</option>
-                <option value="value-desc">Цена: дорогие</option>
-                <option value="name-asc">Имя: A-Z</option>
-                <option value="name-desc">Имя: Z-A</option>
-              </select>
-            </div>
-            <div id="target-nft-list" class="target-chip-list"></div>
-            <p id="target-empty" class="empty-note hidden">Цели недоступны.</p>
-          </div>
-          <section id="onboarding-panel" class="onboarding-panel hidden" aria-live="polite">
-            <h3 id="onboarding-title">Старт</h3>
-            <p id="onboarding-note">Подключи TON Wallet, чтобы загрузить NFT.</p>
-            <div class="onboarding-actions">
-              <button id="onboarding-connect" class="ghost-btn" type="button">Подключить</button>
-              <button id="onboarding-refresh" class="ghost-btn" type="button">Обновить NFT</button>
-            </div>
-          </section>
-          <div class="fair-box">
-            <span class="fair-label">Provably Fair</span>
-            <code id="fair-commitment">-</code>
-            <button id="copy-fair-btn" type="button">Копировать</button>
-          </div>
-
-          <div class="wheel-zone">
-            <div id="chance-ring" class="chance-ring" style="--chance:0">
-              <div class="chance-track" aria-hidden="true"></div>
-              <div class="chance-sheen" aria-hidden="true"></div>
-              <div class="chance-orbit">
-                <svg class="orbit-arrow" viewBox="0 0 14 36" aria-hidden="true" focusable="false">
-                  <path d="M7 2v20" />
-                  <path d="m2 20 5 12 5-12" />
-                </svg>
+          <div class="upgrade-layout">
+            <div class="upgrade-main-col">
+              <div class="target-block">
+                <p class="label" aria-hidden="true"></p>
+                <div class="list-controls">
+                  <input id="target-search" type="search" class="control-input" placeholder="Поиск цели">
+                  <select id="target-sort" class="control-select">
+                    <option value="value-asc">Цена: дешевые</option>
+                    <option value="value-desc">Цена: дорогие</option>
+                    <option value="name-asc">Имя: A-Z</option>
+                    <option value="name-desc">Имя: Z-A</option>
+                  </select>
+                </div>
+                <div id="target-nft-list" class="target-chip-list"></div>
+                <p id="target-empty" class="empty-note hidden">Цели недоступны.</p>
               </div>
-              <div class="chance-core">
-                <strong id="chance-value">0%</strong>
-                <small>Вероятность</small>
+
+              <section id="onboarding-panel" class="onboarding-panel hidden" aria-live="polite">
+                <h3 id="onboarding-title">Старт</h3>
+                <p id="onboarding-note">Подключи TON Wallet, чтобы загрузить NFT.</p>
+                <div class="onboarding-actions">
+                  <button id="onboarding-connect" class="ghost-btn" type="button">Подключить</button>
+                  <button id="onboarding-refresh" class="ghost-btn" type="button">Обновить NFT</button>
+                </div>
+              </section>
+
+              <div class="fair-box">
+                <span class="fair-label">Provably Fair</span>
+                <code id="fair-commitment">-</code>
+                <button id="copy-fair-btn" type="button">Копировать</button>
               </div>
+
+              <div class="wheel-zone">
+                <div id="chance-ring" class="chance-ring" style="--chance:0">
+                  <div class="chance-track" aria-hidden="true"></div>
+                  <div class="chance-sheen" aria-hidden="true"></div>
+                  <div class="chance-orbit">
+                    <svg class="orbit-arrow" viewBox="0 0 14 36" aria-hidden="true" focusable="false">
+                      <path d="M7 2v20" />
+                      <path d="m2 20 5 12 5-12" />
+                    </svg>
+                  </div>
+                  <div class="chance-core">
+                    <strong id="chance-value">0%</strong>
+                    <small>Вероятность</small>
+                  </div>
+                </div>
+              </div>
+
+              <p id="math-note" class="math-note">Выбери NFT</p>
+              <button id="upgrade-btn" class="primary-btn" type="button">Запустить апгрейд</button>
+              <p id="upgrade-result" class="upgrade-result" aria-live="polite"></p>
+            </div>
+
+            <div class="upgrade-side-col">
+              <h2 class="block-title">Мои NFT</h2>
+              <div class="list-controls">
+                <input id="own-search" type="search" class="control-input" placeholder="Поиск NFT">
+                <select id="own-sort" class="control-select">
+                  <option value="value-desc">Цена: дорогие</option>
+                  <option value="value-asc">Цена: дешевые</option>
+                  <option value="name-asc">Имя: A-Z</option>
+                  <option value="name-desc">Имя: Z-A</option>
+                </select>
+              </div>
+              <div id="own-nft-list" class="nft-card-list"></div>
+              <p id="own-empty" class="empty-note">NFT не загружены.</p>
+              <section class="history-block">
+                <div class="history-head">
+                  <h3>История апгрейдов</h3>
+                  <button id="history-clear-btn" type="button">Очистить</button>
+                </div>
+                <div id="upgrade-history" class="history-list"></div>
+                <p id="history-empty" class="empty-note">Пока нет круток.</p>
+              </section>
             </div>
           </div>
-
-          <p id="math-note" class="math-note">Выбери NFT</p>
-          <button id="upgrade-btn" class="primary-btn" type="button">Запустить апгрейд</button>
-          <p id="upgrade-result" class="upgrade-result" aria-live="polite"></p>
-
-          <h2 class="block-title">Мои NFT</h2>
-          <div class="list-controls">
-            <input id="own-search" type="search" class="control-input" placeholder="Поиск NFT">
-            <select id="own-sort" class="control-select">
-              <option value="value-desc">Цена: дорогие</option>
-              <option value="value-asc">Цена: дешевые</option>
-              <option value="name-asc">Имя: A-Z</option>
-              <option value="name-desc">Имя: Z-A</option>
-            </select>
-          </div>
-          <div id="own-nft-list" class="nft-card-list"></div>
-          <p id="own-empty" class="empty-note">NFT не загружены.</p>
-          <section class="history-block">
-            <div class="history-head">
-              <h3>История апгрейдов</h3>
-              <button id="history-clear-btn" type="button">Очистить</button>
-            </div>
-            <div id="upgrade-history" class="history-list"></div>
-            <p id="history-empty" class="empty-note">Пока нет круток.</p>
-          </section>
         </div>
       </section>
 
@@ -148,6 +156,29 @@
               </div>
             </div>
           </div>
+
+          <section id="locale-picker" class="locale-picker">
+            <div class="locale-head">
+              <span id="locale-title">Язык</span>
+              <button id="locale-toggle" class="locale-toggle" type="button" aria-expanded="false" aria-label="Выбрать язык">
+                <span id="locale-current-flag" class="locale-current-flag" aria-hidden="true"></span>
+                <span id="locale-current-code" class="locale-current-code">RU</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+            </div>
+            <div id="locale-menu" class="locale-menu hidden">
+              <label class="locale-search-wrap" for="locale-search">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m16.5 16.5 4 4" />
+                </svg>
+                <input id="locale-search" class="locale-search" type="search" placeholder="Поиск языка или страны">
+              </label>
+              <div id="locale-list" class="locale-list" role="listbox" aria-label="Список языков"></div>
+            </div>
+          </section>
 
           <div class="stat-row">
             <div>
