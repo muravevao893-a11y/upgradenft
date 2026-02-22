@@ -12,19 +12,23 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=2026-02-22-17">
+  <link rel="stylesheet" href="./styles.css?v=2026-02-22-19">
 
   <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
   <script defer src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-  <script defer src="./app.js?v=2026-02-22-17"></script>
+  <script defer src="./app.js?v=2026-02-22-19"></script>
 </head>
 <body>
-  <main class="app-shell">
+  <main id="app-shell" class="app-shell">
     <header class="app-header">
-      <p class="eyebrow">UPGRADE NFT</p>
-      <h1 id="screen-title">Апгрейды</h1>
-      <p id="screen-subtitle" class="subtitle">Выбирай цель и запускай апгрейд.</p>
+      <p class="eyebrow" aria-hidden="true"></p>
+      <h1 id="screen-title" aria-hidden="true"></h1>
+      <p id="screen-subtitle" class="subtitle" aria-hidden="true"></p>
     </header>
+    <button id="wallet-bubble" class="wallet-bubble hidden" type="button" aria-label="Кошелек">
+      <span id="wallet-bubble-balance" class="wallet-bubble-balance">-- TON</span>
+      <span id="wallet-bubble-address" class="wallet-bubble-address">...</span>
+    </button>
 
     <div class="sections-wrap">
       <section class="tab-section" data-tab-section="tasks">
@@ -37,7 +41,7 @@
       <section class="tab-section is-active" data-tab-section="upgrades">
         <div class="screen upgrade-screen">
           <div class="target-block">
-            <p class="label">Цель</p>
+            <p class="label" aria-hidden="true"></p>
             <div id="target-nft-list" class="target-chip-list"></div>
             <p id="target-empty" class="empty-note hidden">Цели недоступны.</p>
           </div>

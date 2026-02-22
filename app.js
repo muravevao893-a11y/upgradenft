@@ -1,25 +1,25 @@
-const APP_VERSION = "2026-02-22-17";
+const APP_VERSION = "2026-02-22-19";
 
 const tabMeta = {
   tasks: {
-    title: "Задания",
-    subtitle: "Текущие активности аккаунта.",
+    title: "",
+    subtitle: "",
   },
   upgrades: {
-    title: "Апгрейды",
+    title: "",
     subtitle: "",
   },
   cases: {
-    title: "Кейсы",
-    subtitle: "Кейсы по текущему рангу и лимитам.",
+    title: "",
+    subtitle: "",
   },
   bonuses: {
-    title: "Бонусы",
-    subtitle: "Активные бусты и сезонные множители.",
+    title: "",
+    subtitle: "",
   },
   profile: {
-    title: "Вы",
-    subtitle: "Профиль",
+    title: "",
+    subtitle: "",
   },
 };
 
@@ -111,6 +111,65 @@ function formatTon(value) {
 function shortAddress(address) {
   if (!address || address.length < 12) return address || "-";
   return `${address.slice(0, 6)}...${address.slice(-6)}`;
+}
+
+function formatTonFromNano(nanoValue) {
+  try {
+    const nano = BigInt(String(nanoValue));
+    const negative = nano < 0n;
+    const abs = negative ? -nano : nano;
+    const whole = abs / 1000000000n;
+    const fraction = abs % 1000000000n;
+    let fractionText = fraction.toString().padStart(9, "0").slice(0, 2);
+    fractionText = fractionText.replace(/0+$/, "");
+    const core = fractionText ? `${whole.toString()}.${fractionText}` : whole.toString();
+    return negative ? `-${core}` : core;
+  } catch {
+    const fallback = Number(nanoValue);
+    if (!Number.isFinite(fallback)) return null;
+    const ton = fallback / 1000000000;
+    const text = ton.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+    return text;
+  }
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs = 9000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchWalletTonBalance(address) {
+  const normalized = String(address || "").trim();
+  if (!normalized) return null;
+  const encoded = encodeURIComponent(normalized);
+
+  const tonApiData = await fetchJsonWithTimeout(`https://tonapi.io/v2/accounts/${encoded}`);
+  const tonApiBalance = tonApiData?.balance;
+  if (tonApiBalance !== undefined && tonApiBalance !== null) {
+    const parsed = formatTonFromNano(tonApiBalance);
+    if (parsed !== null) return parsed;
+  }
+
+  const tonCenterData = await fetchJsonWithTimeout(`https://toncenter.com/api/v2/getAddressInformation?address=${encoded}`);
+  const tonCenterBalance = tonCenterData?.result?.balance;
+  if (tonCenterData?.ok && tonCenterBalance !== undefined && tonCenterBalance !== null) {
+    const parsed = formatTonFromNano(tonCenterBalance);
+    if (parsed !== null) return parsed;
+  }
+
+  return null;
 }
 
 function shortUserId(userId) {
@@ -712,6 +771,13 @@ function setupTelegramUser() {
 function setupTonConnect() {
   const connectButton = document.getElementById("connect-wallet-btn");
   const walletShort = document.getElementById("wallet-short");
+  const walletBubble = document.getElementById("wallet-bubble");
+  const walletBubbleBalance = document.getElementById("wallet-bubble-balance");
+  const walletBubbleAddress = document.getElementById("wallet-bubble-address");
+  const appShell = document.getElementById("app-shell");
+  let balanceRefreshTimer = null;
+  let balanceRequestToken = 0;
+
   const setWalletButtonText = (label) => {
     const textNode = connectButton.querySelector(".wallet-btn-text");
     if (textNode) {
@@ -721,9 +787,50 @@ function setupTonConnect() {
     connectButton.textContent = label;
   };
 
+  const stopBalancePolling = () => {
+    balanceRequestToken += 1;
+    if (balanceRefreshTimer) {
+      clearInterval(balanceRefreshTimer);
+      balanceRefreshTimer = null;
+    }
+  };
+
+  const setBubbleState = (connected, address = "") => {
+    walletBubble.classList.toggle("hidden", !connected);
+    appShell.classList.toggle("has-wallet", connected);
+    if (!connected) return;
+    walletBubbleAddress.textContent = shortAddress(address);
+  };
+
+  const loadWalletBalance = async (address) => {
+    const token = ++balanceRequestToken;
+    walletBubbleBalance.textContent = "Баланс...";
+    const balance = await fetchWalletTonBalance(address);
+    if (token !== balanceRequestToken) return;
+    walletBubbleBalance.textContent = balance ? `${balance} TON` : "-- TON";
+  };
+
+  const startBalancePolling = (address) => {
+    stopBalancePolling();
+    void loadWalletBalance(address);
+    balanceRefreshTimer = window.setInterval(() => {
+      void loadWalletBalance(address);
+    }, 30000);
+  };
+
+  walletBubble.addEventListener("click", async () => {
+    if (!state.tonConnectUI) return;
+    try {
+      await state.tonConnectUI.openModal();
+    } catch (error) {
+      console.error("TonConnect bubble action error:", error);
+    }
+  });
+
   if (!window.TON_CONNECT_UI?.TonConnectUI) {
     walletShort.textContent = "TonConnect UI не загружен";
     connectButton.disabled = true;
+    setBubbleState(false);
     return;
   }
 
@@ -737,6 +844,7 @@ function setupTonConnect() {
     console.error("TonConnect init error:", error);
     walletShort.textContent = "Ошибка инициализации TON Connect";
     connectButton.disabled = true;
+    setBubbleState(false);
     return;
   }
 
@@ -744,10 +852,19 @@ function setupTonConnect() {
     const address = wallet?.account?.address || state.tonConnectUI?.account?.address || "";
     const connected = Boolean(address);
 
-    setWalletButtonText(connected ? "Disconnect Wallet" : "Connect Wallet");
-    walletShort.textContent = connected
-      ? `Подключен: ${shortAddress(address)}`
-      : "Кошелек не подключен";
+    setWalletButtonText("Connect Wallet");
+    connectButton.classList.toggle("hidden", connected);
+    connectButton.disabled = false;
+    walletShort.textContent = connected ? "Кошелек подключен" : "Кошелек не подключен";
+    setBubbleState(connected, address);
+
+    if (connected) {
+      startBalancePolling(address);
+    } else {
+      stopBalancePolling();
+      walletBubbleBalance.textContent = "-- TON";
+      walletBubbleAddress.textContent = "...";
+    }
   };
 
   paintConnectionState(state.tonConnectUI.wallet);
@@ -759,11 +876,7 @@ function setupTonConnect() {
 
   connectButton.addEventListener("click", async () => {
     try {
-      if (state.tonConnectUI.connected) {
-        await state.tonConnectUI.disconnect();
-      } else {
-        await state.tonConnectUI.openModal();
-      }
+      await state.tonConnectUI.openModal();
     } catch (error) {
       console.error("TonConnect action error:", error);
       walletShort.textContent = "Не удалось подключить кошелек";

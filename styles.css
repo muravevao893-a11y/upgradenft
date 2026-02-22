@@ -52,10 +52,65 @@ p {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  position: relative;
 }
 
 .app-header {
   min-height: 70px;
+}
+
+.app-shell.has-wallet .app-header {
+  padding-right: 128px;
+}
+
+.wallet-bubble {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 8px);
+  right: 10px;
+  min-width: 112px;
+  height: 42px;
+  padding: 6px 12px 6px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #171c28, #0f131d);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #f2f5ff;
+  display: grid;
+  align-content: center;
+  justify-items: end;
+  gap: 1px;
+  z-index: 25;
+  cursor: pointer;
+}
+
+.wallet-bubble::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8fd9aa;
+  transform: translateY(-50%);
+  box-shadow: 0 0 10px rgba(143, 217, 170, 0.55);
+}
+
+.wallet-bubble:active {
+  transform: translateY(1px);
+}
+
+.wallet-bubble-balance {
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.wallet-bubble-address {
+  font-size: 10px;
+  line-height: 1;
+  color: var(--muted);
+  letter-spacing: 0.03em;
 }
 
 .eyebrow {
@@ -898,6 +953,18 @@ p {
     padding-inline: 8px;
   }
 
+  .app-shell.has-wallet .app-header {
+    padding-right: 112px;
+  }
+
+  .wallet-bubble {
+    min-width: 98px;
+    height: 38px;
+    padding: 5px 10px 5px 14px;
+    top: calc(env(safe-area-inset-top) + 6px);
+    right: 8px;
+  }
+
   .chance-ring {
     width: 150px;
     height: 150px;
@@ -952,5 +1019,441 @@ p {
     border: 1px solid var(--line);
     border-radius: 16px;
     bottom: 8px;
+  }
+}
+
+/* Refresh 2026-02-22 */
+body {
+  background:
+    radial-gradient(860px 520px at 8% -25%, #161d2a 0%, transparent 68%),
+    radial-gradient(840px 520px at 100% 120%, #101722 0%, transparent 62%),
+    linear-gradient(180deg, #070a11 0%, #080b12 52%, #06080e 100%);
+}
+
+.app-shell {
+  padding-top: calc(env(safe-area-inset-top) + 8px);
+  gap: 10px;
+}
+
+.app-header {
+  display: none;
+}
+
+.sections-wrap {
+  padding-top: 8px;
+}
+
+.app-shell.has-wallet .sections-wrap {
+  padding-top: 52px;
+}
+
+.wallet-bubble {
+  top: calc(env(safe-area-inset-top) + 6px);
+  right: 10px;
+  height: 38px;
+  min-width: 106px;
+  padding: 5px 10px 5px 14px;
+  border-radius: 14px;
+  border-color: #2d3447;
+  background:
+    radial-gradient(150px 60px at 90% -20%, rgba(153, 173, 214, 0.24), transparent 66%),
+    linear-gradient(180deg, #151c2a, #0f1420);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 8px 18px rgba(0, 0, 0, 0.3);
+}
+
+.wallet-bubble::before {
+  left: 7px;
+  width: 5px;
+  height: 5px;
+}
+
+.wallet-bubble-balance {
+  font-size: 12px;
+}
+
+.wallet-bubble-address {
+  font-size: 9px;
+}
+
+.screen {
+  gap: 10px;
+}
+
+.simple-list {
+  gap: 9px;
+}
+
+.simple-item {
+  border: 1px solid #263045;
+  border-bottom: 1px solid #263045;
+  border-radius: 14px;
+  background:
+    radial-gradient(140px 70px at 92% -20%, rgba(133, 152, 192, 0.18), transparent 66%),
+    #101521;
+  padding: 10px 12px;
+  align-items: center;
+}
+
+.simple-item strong {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.simple-item small {
+  margin-top: 3px;
+  font-size: 11px;
+}
+
+.simple-item span {
+  font-size: 13px;
+}
+
+.upgrade-screen {
+  align-items: stretch;
+  text-align: center;
+  gap: 12px;
+}
+
+.target-block {
+  gap: 8px;
+}
+
+.label {
+  display: none;
+}
+
+.target-chip-list {
+  gap: 8px;
+  padding-bottom: 2px;
+  justify-content: flex-start;
+}
+
+.target-chip {
+  min-width: 128px;
+  max-width: 162px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border-color: #2d3447;
+  background: #101622;
+}
+
+.target-chip b {
+  font-size: 12px;
+}
+
+.target-chip span {
+  font-size: 10px;
+}
+
+.wheel-zone {
+  margin-top: 0;
+}
+
+.chance-ring {
+  width: 188px;
+  height: 188px;
+  border: 0;
+  background:
+    radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.2), transparent 40%),
+    conic-gradient(
+      from -90deg,
+      #de6a6a 0 calc(var(--chance) * 1%),
+      #364057 calc(var(--chance) * 1%) 100%
+    );
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 16px 34px rgba(0, 0, 0, 0.42);
+}
+
+.chance-ring::after {
+  inset: 22px;
+  border-color: #323c52;
+  box-shadow:
+    inset 0 0 24px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.chance-track {
+  opacity: 0.48;
+  background: repeating-conic-gradient(
+    from -90deg,
+    rgba(235, 239, 247, 0.18) 0deg 1deg,
+    transparent 1deg 7deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 20px), #000 calc(100% - 20px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 20px), #000 calc(100% - 20px));
+}
+
+.chance-sheen {
+  opacity: 0.58;
+}
+
+.chance-core {
+  gap: 4px;
+}
+
+.chance-core strong {
+  font-size: 52px;
+  text-shadow: 0 2px 16px rgba(153, 184, 249, 0.26);
+}
+
+.chance-core small {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.chance-orbit {
+  inset: 14px;
+}
+
+.chance-orbit::before {
+  width: 7px;
+  height: 7px;
+  box-shadow:
+    0 0 0 2px #0f1117,
+    0 0 10px rgba(242, 246, 255, 0.52);
+}
+
+.chance-orbit::after {
+  inset: -1px;
+  background: conic-gradient(
+    from -90deg,
+    rgba(241, 245, 255, 0.6) 0deg,
+    rgba(241, 245, 255, 0.3) 18deg,
+    rgba(241, 245, 255, 0) 52deg
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 10px),
+    #000 calc(100% - 9px),
+    #000 calc(100% - 4px),
+    transparent calc(100% - 3px)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 10px),
+    #000 calc(100% - 9px),
+    #000 calc(100% - 4px),
+    transparent calc(100% - 3px)
+  );
+}
+
+.math-note {
+  font-size: 12px;
+}
+
+.primary-btn {
+  height: 46px;
+  border-radius: 14px;
+  border-color: #3c4660;
+  background: linear-gradient(180deg, #2a3142, #1d2433);
+  font-weight: 800;
+}
+
+.block-title {
+  text-align: center;
+  font-size: 17px;
+}
+
+.nft-card-list {
+  max-height: 228px;
+}
+
+.nft-card {
+  border-color: #2c354a;
+  background:
+    radial-gradient(160px 90px at 80% -30%, rgba(126, 143, 180, 0.22), transparent 65%),
+    #0f1520;
+}
+
+.nft-card.is-active {
+  border-color: #d8deec;
+  box-shadow: 0 0 0 1px rgba(216, 222, 236, 0.26);
+}
+
+.nft-thumb {
+  height: 88px;
+}
+
+.nft-body {
+  padding: 8px;
+}
+
+.nft-body strong {
+  font-size: 12px;
+}
+
+.nft-body span {
+  font-size: 12px;
+}
+
+.case-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.case-item {
+  min-height: 120px;
+  border-radius: 16px;
+  border-color: #2b3449;
+  padding: 12px;
+  background:
+    radial-gradient(130px 80px at 90% -10%, rgba(134, 151, 189, 0.22), transparent 65%),
+    #101621;
+}
+
+.case-item strong {
+  font-size: 18px;
+}
+
+.profile-screen {
+  gap: 12px;
+}
+
+.profile-top {
+  border: 1px solid #293248;
+  border-radius: 16px;
+  padding: 10px;
+  background:
+    radial-gradient(140px 70px at 90% -20%, rgba(131, 150, 187, 0.2), transparent 67%),
+    #101621;
+}
+
+.profile-avatar {
+  width: 56px;
+  height: 56px;
+  border-color: #3a455e;
+}
+
+.profile-meta h2 {
+  font-size: clamp(21px, 5.6vw, 26px);
+}
+
+.profile-rank {
+  min-width: 58px;
+  padding: 6px 8px;
+  border-color: #3a455e;
+  background: #0f1520;
+}
+
+.stat-row {
+  gap: 8px;
+  border: 0;
+}
+
+.stat-row div {
+  border: 1px solid #2a3247;
+  border-radius: 12px;
+  background: #0f1520;
+}
+
+.stat-row div + div {
+  border-left: 1px solid #2a3247;
+}
+
+.stat-row strong {
+  font-size: 20px;
+}
+
+.wallet-btn {
+  height: 40px;
+  border-radius: 12px;
+}
+
+.wallet-short {
+  display: none;
+}
+
+.profile-tabs {
+  border: 1px solid #2a3247;
+  border-radius: 14px;
+  padding: 4px;
+  background: #0f1520;
+}
+
+.profile-tab-btn {
+  height: 34px;
+  border-radius: 10px;
+  border: 0;
+  font-size: 13px;
+  color: #99a2b8;
+}
+
+.profile-tab-btn.is-active {
+  border: 1px solid #3b4560;
+  background: #1b2232;
+  color: #f4f7ff;
+}
+
+.profile-nft-grid {
+  max-height: 214px;
+}
+
+.profile-nft-card {
+  border-color: #2b3449;
+  border-radius: 14px;
+  background: #0f1520;
+}
+
+.bottom-nav {
+  background: rgba(8, 11, 17, 0.97);
+  border-top-color: #232d40;
+}
+
+.nav-btn {
+  color: #99a4bb;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.nav-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.nav-btn.is-active {
+  color: #f5f8ff;
+}
+
+@media (max-width: 380px) {
+  .app-shell.has-wallet .sections-wrap {
+    padding-top: 48px;
+  }
+
+  .chance-ring {
+    width: 172px;
+    height: 172px;
+  }
+
+  .chance-ring::after {
+    inset: 20px;
+  }
+
+  .chance-track {
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 18px), #000 calc(100% - 18px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 18px), #000 calc(100% - 18px));
+  }
+
+  .chance-core strong {
+    font-size: 44px;
+  }
+
+  .nft-card-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .block-title {
+    font-size: 16px;
+  }
+
+  .profile-avatar {
+    width: 50px;
+    height: 50px;
+  }
+
+  .profile-meta h2 {
+    font-size: 20px;
   }
 }
