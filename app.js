@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-25";
+const APP_VERSION = "2026-02-22-26";
 
 const tabMeta = {
   tasks: {
