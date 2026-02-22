@@ -31,7 +31,7 @@
   --shadow-lift: 0 16px 42px rgba(0, 0, 0, 0.48);
 
   --app-width: 500px;
-  --nav-height: 88px;
+  --nav-height: 78px;
   --runtime-nav-height: var(--nav-height);
 }
 
@@ -383,10 +383,60 @@ svg {
 
 .empty-note {
   color: var(--text-3);
-  font-size: 13px;
-  line-height: 1.3;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
   text-align: center;
-  padding: 4px 8px;
+  padding: 6px 10px;
+  margin-inline: auto;
+  max-width: min(92%, 560px);
+  text-wrap: balance;
+}
+
+.simple-screen .simple-list:empty,
+.simple-screen .case-list:empty {
+  display: none;
+}
+
+.simple-screen .empty-note {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: clamp(18px, 4.9vw, 24px);
+  line-height: 1.25;
+  padding: 0 12px;
+}
+
+.upgrade-side-col .nft-card-list:empty {
+  display: none;
+}
+
+.upgrade-side-col #own-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: clamp(16px, 4.2vw, 22px);
+  line-height: 1.3;
+}
+
+.target-block #target-empty {
+  margin-top: 6px;
+  font-size: clamp(16px, 4.2vw, 21px);
+}
+
+.profile-screen #my-empty,
+.profile-screen #dropped-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: clamp(17px, 4.4vw, 23px);
+  line-height: 1.28;
 }
 
 .simple-list {
@@ -2242,16 +2292,16 @@ video.nft-media {
   position: fixed;
   left: 50%;
   right: auto;
-  bottom: max(8px, calc(env(safe-area-inset-bottom) + 6px));
-  width: calc(100% - 14px);
-  max-width: calc(var(--app-width) - 20px);
+  bottom: max(16px, calc(env(safe-area-inset-bottom) + 12px));
+  width: calc(100% - 34px);
+  max-width: calc(var(--app-width) - 48px);
   height: var(--nav-height);
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: center;
-  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
   border: 1px solid rgba(146, 190, 236, 0.32);
-  border-radius: 24px;
+  border-radius: 999px;
   background:
     linear-gradient(180deg, rgba(14, 25, 39, 0.62) 0%, rgba(8, 16, 28, 0.54) 100%);
   box-shadow:
@@ -2314,22 +2364,22 @@ video.nft-media {
   background: transparent;
   color: #9ab0c8;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   cursor: pointer;
   transition: color 0.28s ease, transform 0.28s ease;
   z-index: 1;
 }
 
 .nav-btn svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2.15;
@@ -2420,10 +2470,11 @@ video.nft-media {
 }
 
 body[data-device="mobile"] .bottom-nav {
-  width: calc(100% - 12px);
-  max-width: calc(100% - 12px);
-  border-radius: 22px;
-  padding-inline: 8px;
+  bottom: max(16px, calc(env(safe-area-inset-bottom) + 12px));
+  width: calc(100% - 30px);
+  max-width: calc(100% - 30px);
+  border-radius: 999px;
+  padding-inline: 7px;
 }
 
 .app-shell[data-device="desktop"].is-internal-screen {
@@ -2462,62 +2513,60 @@ body[data-device="mobile"] .bottom-nav {
 }
 
 .app-shell[data-device="desktop"] .simple-list {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   align-content: start;
 }
 
 .app-shell[data-device="desktop"] .case-list {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
 }
 
 .app-shell[data-device="desktop"] .upgrade-screen {
-  text-align: left;
-  height: 100%;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  text-align: center;
 }
 
 .app-shell[data-device="desktop"] .upgrade-layout {
-  height: 100%;
-  grid-template-columns: minmax(340px, 410px) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: 1fr;
+  height: auto;
+  gap: 12px;
+}
+
+.app-shell[data-device="desktop"][data-layout="compact"] .list-controls {
+  grid-template-columns: 1fr;
+}
+
+.app-shell[data-device="desktop"][data-layout="compact"] .control-select {
+  min-width: 0;
 }
 
 .app-shell[data-device="desktop"] .upgrade-main-col,
 .app-shell[data-device="desktop"] .upgrade-side-col {
-  min-height: 0;
-  border: 1px solid rgba(146, 190, 236, 0.2);
-  border-radius: 18px;
-  background:
-    radial-gradient(210px 120px at 0% -58%, rgba(154, 204, 255, 0.16), transparent 72%),
-    linear-gradient(180deg, rgba(20, 35, 52, 0.78), rgba(14, 27, 42, 0.82));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 14px 28px rgba(0, 0, 0, 0.28);
-  padding: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
 }
 
 .app-shell[data-device="desktop"] .upgrade-main-col {
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
 }
 
 .app-shell[data-device="desktop"] .upgrade-side-col {
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
 }
 
 .app-shell[data-device="desktop"] .block-title {
-  text-align: left;
-  font-size: 30px;
-}
-
-.app-shell[data-device="desktop"] .wheel-zone {
-  margin-top: 4px;
+  text-align: center;
+  font-size: clamp(24px, 6vw, 30px);
 }
 
 .app-shell[data-device="desktop"] .chance-ring {
-  width: clamp(220px, 25vw, 286px);
+  width: clamp(188px, 56vw, 236px);
 }
 
 .app-shell[data-device="desktop"] .math-note,
@@ -2526,7 +2575,10 @@ body[data-device="mobile"] .bottom-nav {
 }
 
 .app-shell[data-device="desktop"] .nft-card-list {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow: visible;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .app-shell[data-device="desktop"] .history-list {
@@ -2547,8 +2599,69 @@ body[data-device="mobile"] .bottom-nav {
 }
 
 .app-shell[data-device="desktop"] .profile-nft-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   max-height: 42vh;
+}
+
+.app-shell[data-device="desktop"][data-layout="wide"] .simple-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app-shell[data-device="desktop"][data-layout="wide"] .case-list {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.app-shell[data-device="desktop"][data-layout="wide"] .upgrade-screen {
+  text-align: left;
+  height: 100%;
+  overflow: hidden;
+}
+
+.app-shell[data-device="desktop"][data-layout="wide"] .upgrade-layout {
+  height: 100%;
+  grid-template-columns: minmax(340px, 410px) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.app-shell[data-device="desktop"][data-layout="wide"] .upgrade-main-col,
+.app-shell[data-device="desktop"][data-layout="wide"] .upgrade-side-col {
+  min-height: 0;
+  border: 1px solid rgba(146, 190, 236, 0.2);
+  border-radius: 18px;
+  background:
+    radial-gradient(210px 120px at 0% -58%, rgba(154, 204, 255, 0.16), transparent 72%),
+    linear-gradient(180deg, rgba(20, 35, 52, 0.78), rgba(14, 27, 42, 0.82));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 14px 28px rgba(0, 0, 0, 0.28);
+  padding: 12px;
+}
+
+.app-shell[data-device="desktop"][data-layout="wide"] .upgrade-main-col,
+.app-shell[data-device="desktop"][data-layout="wide"] .upgrade-side-col {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.app-shell[data-device="desktop"][data-layout="wide"] .block-title {
+  text-align: left;
+  font-size: 30px;
+}
+
+.app-shell[data-device="desktop"][data-layout="wide"] .wheel-zone {
+  margin-top: 4px;
+}
+
+.app-shell[data-device="desktop"][data-layout="wide"] .chance-ring {
+  width: clamp(220px, 25vw, 286px);
+}
+
+.app-shell[data-device="desktop"][data-layout="wide"] .nft-card-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-shell[data-device="desktop"][data-layout="wide"] .profile-nft-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .app-shell[data-device="desktop"] .locale-menu {
@@ -2561,14 +2674,14 @@ body[data-device="mobile"] .bottom-nav {
 }
 
 body[data-device="desktop"] .bottom-nav {
-  width: calc(100% - 28px);
-  max-width: 1060px;
+  bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px));
+  width: calc(100% - 46px);
+  max-width: 980px;
   left: 50%;
   right: auto;
   transform: translateX(-50%);
   border: 1px solid rgba(146, 190, 236, 0.32);
-  border-radius: 24px;
-  bottom: max(8px, calc(env(safe-area-inset-bottom) + 6px));
+  border-radius: 999px;
 }
 
 body[data-device="desktop"] .bottom-nav.is-hidden {

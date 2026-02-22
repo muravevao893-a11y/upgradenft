@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-60";
+const APP_VERSION = "2026-02-22-65";
 
 const tabMeta = {
   tasks: {
@@ -645,6 +645,127 @@ const state = {
   },
 };
 
+const CP1251_DECODER = (() => {
+  try {
+    return new TextDecoder("windows-1251", { fatal: false });
+  } catch {
+    return null;
+  }
+})();
+
+const UTF8_DECODER = (() => {
+  try {
+    return new TextDecoder("utf-8", { fatal: false });
+  } catch {
+    return null;
+  }
+})();
+
+const CP1251_CHAR_TO_BYTE = (() => {
+  const map = new Map();
+  if (!CP1251_DECODER) return map;
+
+  for (let index = 0; index < 256; index += 1) {
+    const byte = Uint8Array.of(index);
+    const char = CP1251_DECODER.decode(byte);
+    if (!map.has(char)) {
+      map.set(char, index);
+    }
+  }
+  return map;
+})();
+
+function looksLikeMojibakeText(value) {
+  const raw = String(value ?? "");
+  if (!raw) return false;
+  if (raw.includes("вЂ") || raw.includes("в„")) return true;
+  const chunks = raw.match(/[РС][А-Яа-яЁёЇїІіЄє]/g) || [];
+  return chunks.length >= 2;
+}
+
+function decodeCp1251Utf8Mojibake(value) {
+  const raw = String(value ?? "");
+  if (!raw || !UTF8_DECODER || CP1251_CHAR_TO_BYTE.size === 0) return raw;
+
+  const bytes = new Uint8Array(raw.length);
+  for (let index = 0; index < raw.length; index += 1) {
+    const byte = CP1251_CHAR_TO_BYTE.get(raw[index]);
+    if (byte === undefined) {
+      return raw;
+    }
+    bytes[index] = byte;
+  }
+
+  try {
+    return UTF8_DECODER.decode(bytes);
+  } catch {
+    return raw;
+  }
+}
+
+function fixMojibakeText(value) {
+  const raw = String(value ?? "");
+  if (!raw || !looksLikeMojibakeText(raw)) return raw;
+
+  const decoded = decodeCp1251Utf8Mojibake(raw);
+  if (!decoded || decoded === raw || decoded.includes("�")) return raw;
+
+  const decodedLetters = (decoded.match(/[A-Za-zА-Яа-яЁёЇїІіЄє]/g) || []).length;
+  if (decodedLetters === 0 && !decoded.includes("•")) return raw;
+  return decoded;
+}
+
+function sanitizeTranslationsAndLocales() {
+  Object.keys(TRANSLATIONS).forEach((localeCode) => {
+    const pack = TRANSLATIONS[localeCode];
+    if (!pack || typeof pack !== "object") return;
+    Object.keys(pack).forEach((key) => {
+      if (typeof pack[key] !== "string") return;
+      pack[key] = fixMojibakeText(pack[key]);
+    });
+  });
+
+  LOCALE_OPTIONS.forEach((option) => {
+    if (!option || typeof option !== "object") return;
+    if (!Array.isArray(option.tokens)) return;
+    option.tokens = option.tokens
+      .map((token) => fixMojibakeText(token))
+      .map((token) => String(token ?? "").trim())
+      .filter(Boolean);
+  });
+}
+
+function fixMojibakeInDom(root = document) {
+  if (!root?.body || typeof root.createTreeWalker !== "function") return;
+
+  const walker = root.createTreeWalker(root.body, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) {
+    textNodes.push(walker.currentNode);
+  }
+
+  textNodes.forEach((node) => {
+    const nextValue = fixMojibakeText(node.nodeValue ?? "");
+    if (nextValue && nextValue !== node.nodeValue) {
+      node.nodeValue = nextValue;
+    }
+  });
+
+  const attributes = ["placeholder", "aria-label", "title"];
+  root.querySelectorAll("*").forEach((element) => {
+    attributes.forEach((attribute) => {
+      const raw = element.getAttribute(attribute);
+      if (!raw) return;
+      const fixed = fixMojibakeText(raw);
+      if (fixed && fixed !== raw) {
+        element.setAttribute(attribute, fixed);
+      }
+    });
+  });
+}
+
+sanitizeTranslationsAndLocales();
+
 function formatI18n(template, params = {}) {
   return String(template ?? "").replace(/\{(\w+)\}/g, (_, key) => {
     if (params[key] === undefined || params[key] === null) return "";
@@ -671,7 +792,7 @@ function t(key, params) {
   const localePack = TRANSLATIONS[state.locale] || TRANSLATIONS[DEFAULT_LOCALE];
   const fallbackPack = TRANSLATIONS[DEFAULT_LOCALE];
   const value = localePack?.[key] ?? fallbackPack?.[key] ?? key;
-  return formatI18n(value, params);
+  return formatI18n(fixMojibakeText(value), params);
 }
 
 function detectDeviceProfile() {
@@ -745,6 +866,9 @@ function refreshLayoutAnchors() {
   if (!shell || !sectionsWrap) return;
 
   const shellRect = shell.getBoundingClientRect();
+  const layoutMode = shellRect.width >= 900 ? "wide" : "compact";
+  shell.dataset.layout = layoutMode;
+  document.body.dataset.layout = layoutMode;
   let topPad = 4;
 
   if (walletBubble && !walletBubble.classList.contains("hidden")) {
@@ -1020,13 +1144,13 @@ function setupProfileCopyActions() {
 function setText(selector, value) {
   const node = document.querySelector(selector);
   if (!node) return;
-  node.textContent = value;
+  node.textContent = fixMojibakeText(value);
 }
 
 function setPlaceholder(selector, value) {
   const node = document.querySelector(selector);
   if (!node) return;
-  node.setAttribute("placeholder", value);
+  node.setAttribute("placeholder", fixMojibakeText(value));
 }
 
 function getLocaleOption(code) {
@@ -2525,15 +2649,16 @@ async function fetchTelegramProfileGifts(ownerAddress = "") {
     .filter(Boolean);
 }
 
-async function fetchAccountNftItemsPage(owner, indirectOwnership) {
+async function fetchAccountNftItemsPage(owner, indirectOwnership, chain = "") {
   const encodedOwner = encodeURIComponent(owner);
   const collected = [];
   let offset = 0;
   let hadResponse = false;
   const indirectParam = typeof indirectOwnership === "boolean" ? `&indirect_ownership=${indirectOwnership}` : "";
+  const tonApiBase = resolveTonApiBase(chain);
 
   for (let page = 0; page < NFT_MAX_PAGES; page += 1) {
-    const url = `${TONAPI_BASE}/accounts/${encodedOwner}/nfts?limit=${NFT_PAGE_LIMIT}&offset=${offset}${indirectParam}`;
+    const url = `${tonApiBase}/accounts/${encodedOwner}/nfts?limit=${NFT_PAGE_LIMIT}&offset=${offset}${indirectParam}`;
     const payload = await fetchJsonWithTimeout(url, 12000);
     if (!payload) {
       if (!hadResponse) return null;
@@ -2551,7 +2676,7 @@ async function fetchAccountNftItemsPage(owner, indirectOwnership) {
   return collected;
 }
 
-async function fetchAccountNftItems(address) {
+async function fetchAccountNftItems(address, chain = "") {
   const owner = String(address || "").trim();
   if (!owner) return [];
 
@@ -2561,7 +2686,7 @@ async function fetchAccountNftItems(address) {
   let fallback = [];
 
   for (const mode of modes) {
-    const items = await fetchAccountNftItemsPage(owner, mode);
+    const items = await fetchAccountNftItemsPage(owner, mode, chain);
     if (items === null) continue;
 
     hadValidResponse = true;
@@ -2572,13 +2697,14 @@ async function fetchAccountNftItems(address) {
   return hadValidResponse ? fallback : null;
 }
 
-async function fetchCollectionMarketSnapshot(collectionAddress, ownerAddress) {
+async function fetchCollectionMarketSnapshot(collectionAddress, ownerAddress, chain = "") {
   const collection = String(collectionAddress || "").trim();
   if (!collection) {
     return { collectionAddress: "", floorTon: null, listings: [] };
   }
 
-  const url = `${TONAPI_BASE}/nfts/collections/${encodeURIComponent(collection)}/items?limit=${COLLECTION_SCAN_LIMIT}&offset=0`;
+  const tonApiBase = resolveTonApiBase(chain);
+  const url = `${tonApiBase}/nfts/collections/${encodeURIComponent(collection)}/items?limit=${COLLECTION_SCAN_LIMIT}&offset=0`;
   const payload = await fetchJsonWithTimeout(url, 12000);
   const items = safeArray(payload?.nft_items);
   const listings = [];
@@ -2631,11 +2757,11 @@ function buildOwnedInventoryLists(ownItems, floorByCollection, prefix = "owned",
   return { profileInventory, inventory };
 }
 
-async function fetchBankWalletTargets() {
+async function fetchBankWalletTargets(chain = "") {
   const bankAddress = String(BANK_WALLET_ADDRESS || "").trim();
   if (!bankAddress) return [];
 
-  const ownItems = await fetchAccountNftItems(bankAddress);
+  const ownItems = await fetchAccountNftItems(bankAddress, chain);
   if (!ownItems || ownItems.length === 0) return [];
 
   const uniqueCollections = Array.from(
@@ -2647,7 +2773,7 @@ async function fetchBankWalletTargets() {
   ).slice(0, Math.max(MAX_COLLECTIONS_FOR_MARKET, 12));
 
   const snapshots = await Promise.all(
-    uniqueCollections.map((collectionAddress) => fetchCollectionMarketSnapshot(collectionAddress, bankAddress)),
+    uniqueCollections.map((collectionAddress) => fetchCollectionMarketSnapshot(collectionAddress, bankAddress, chain)),
   );
 
   const floorByCollection = new Map();
@@ -3042,7 +3168,7 @@ async function resolveUpgradeViaBackend({ source, target, chance, onQueueUpdate 
   }
 }
 
-async function fetchWalletMarketData(address) {
+async function fetchWalletMarketData(address, chain = "") {
   const ownerAddress = String(address || "").trim();
   if (!ownerAddress) {
     return {
@@ -3052,7 +3178,7 @@ async function fetchWalletMarketData(address) {
     };
   }
 
-  const ownItems = await fetchAccountNftItems(ownerAddress);
+  const ownItems = await fetchAccountNftItems(ownerAddress, chain);
   if (ownItems === null) return null;
   const uniqueCollections = Array.from(
     new Set(
@@ -3063,7 +3189,7 @@ async function fetchWalletMarketData(address) {
   ).slice(0, MAX_COLLECTIONS_FOR_MARKET);
 
   const snapshots = await Promise.all(
-    uniqueCollections.map((collectionAddress) => fetchCollectionMarketSnapshot(collectionAddress, ownerAddress)),
+    uniqueCollections.map((collectionAddress) => fetchCollectionMarketSnapshot(collectionAddress, ownerAddress, chain)),
   );
 
   const floorByCollection = new Map();
@@ -4297,10 +4423,10 @@ function setupTonConnect() {
     renderAll();
   };
 
-  const loadWalletNfts = async (address) => {
+  const loadWalletNfts = async (address, chain = state.tonChain) => {
     const token = ++nftRequestToken;
     setWalletShort("wallet_syncing_nft");
-    const marketData = await fetchWalletMarketData(address);
+    const marketData = await fetchWalletMarketData(address, chain);
     if (token !== nftRequestToken) return null;
 
     if (!marketData) {
@@ -4310,7 +4436,7 @@ function setupTonConnect() {
 
     let preferredTargets = safeArray(marketData.targets);
     try {
-      const bankTargets = await fetchBankWalletTargets();
+      const bankTargets = await fetchBankWalletTargets(chain);
       if (token !== nftRequestToken) return null;
       if (bankTargets.length > 0) {
         preferredTargets = bankTargets;
@@ -4334,11 +4460,11 @@ function setupTonConnect() {
     return marketData;
   };
 
-  const startNftPolling = (address) => {
+  const startNftPolling = (address, chain = state.tonChain) => {
     stopNftPolling();
-    void loadWalletNfts(address);
+    void loadWalletNfts(address, chain);
     nftRefreshTimer = window.setInterval(() => {
-      void loadWalletNfts(address);
+      void loadWalletNfts(address, chain);
     }, 90000);
   };
 
@@ -4348,7 +4474,7 @@ function setupTonConnect() {
 
     let bankTargets = [];
     try {
-      bankTargets = await fetchBankWalletTargets();
+      bankTargets = await fetchBankWalletTargets(state.tonChain);
     } catch (error) {
       console.warn("Bank targets loading failed:", error);
     }
@@ -4398,7 +4524,7 @@ function setupTonConnect() {
   state.refreshWalletData = async () => {
     if (!state.tonAddress) return;
     await loadWalletBalance(state.tonAddress, state.tonChain);
-    await loadWalletNfts(state.tonAddress);
+    await loadWalletNfts(state.tonAddress, state.tonChain);
   };
 
   const paintConnectionState = (wallet) => {
@@ -4421,7 +4547,7 @@ function setupTonConnect() {
 
       setWalletShort("wallet_syncing_nft");
       startBalancePolling(address, chain);
-      startNftPolling(address);
+      startNftPolling(address, chain);
     } else {
       state.tonAddress = "";
       state.tonChain = "";
@@ -4448,7 +4574,7 @@ function setupTonConnect() {
   const refreshOnVisibility = () => {
     if (!state.tonAddress || document.hidden) return;
     void loadWalletBalance(state.tonAddress, state.tonChain);
-    void loadWalletNfts(state.tonAddress);
+    void loadWalletNfts(state.tonAddress, state.tonChain);
   };
   document.addEventListener("visibilitychange", refreshOnVisibility);
   window.addEventListener("focus", refreshOnVisibility);
@@ -4509,6 +4635,7 @@ function setupTonConnect() {
 }
 
 async function bootstrap() {
+  fixMojibakeInDom(document);
   loadPersistentData();
   recordAnalytics("launches");
   setNetworkStatus("idle");
