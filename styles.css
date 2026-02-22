@@ -474,23 +474,22 @@ svg {
   display: grid;
   place-items: center;
   background:
-    radial-gradient(circle at 50% 16%, rgba(255, 255, 255, 0.19), transparent 58%),
-    radial-gradient(circle at 50% 52%, #141414 0%, #090909 66%, #040404 100%);
+    radial-gradient(circle at 50% 14%, rgba(255, 255, 255, 0.14), transparent 52%),
+    radial-gradient(circle at 50% 56%, #15181f 0%, #090b0f 66%, #05070a 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 0 58px rgba(0, 0, 0, 0.48),
-    0 18px 42px rgba(0, 0, 0, 0.55),
-    0 0 24px rgba(255, 255, 255, 0.08);
-  animation: chance-ring-pulse 4.8s ease-in-out infinite;
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 46px rgba(0, 0, 0, 0.5),
+    0 16px 34px rgba(0, 0, 0, 0.56);
+  animation: chance-ring-breathe 5.6s ease-in-out infinite;
 }
 
-@keyframes chance-ring-pulse {
+@keyframes chance-ring-breathe {
   0%,
   100% {
     filter: brightness(1) saturate(1);
   }
   50% {
-    filter: brightness(1.05) saturate(1.08);
+    filter: brightness(1.04) saturate(1.04);
   }
 }
 
@@ -499,45 +498,39 @@ svg {
   position: absolute;
   inset: 0;
   border-radius: 50%;
+  z-index: 1;
   background:
-    conic-gradient(
-      from -90deg,
-      rgba(246, 246, 246, 0.98) 0deg,
-      rgba(214, 214, 214, 0.92) var(--chance-angle),
-      rgba(70, 70, 70, 0.96) var(--chance-angle),
-      rgba(70, 70, 70, 0.96) 360deg
-    );
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.1), transparent 60%),
+    rgba(74, 79, 92, 0.9);
   -webkit-mask: radial-gradient(
     farthest-side,
-    transparent calc(100% - 23px),
-    #000 calc(100% - 22px)
+    transparent calc(100% - 21px),
+    #000 calc(100% - 20px)
   );
   mask: radial-gradient(
     farthest-side,
-    transparent calc(100% - 23px),
-    #000 calc(100% - 22px)
+    transparent calc(100% - 21px),
+    #000 calc(100% - 20px)
   );
 }
 
 .chance-ring.is-empty::before {
-  background: conic-gradient(
-    from -90deg,
-    rgba(70, 70, 70, 0.96) 0deg 360deg
-  );
+  opacity: 0.86;
 }
 
 .chance-ring::after {
   content: "";
   position: absolute;
-  inset: 24px;
+  inset: 23px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  z-index: 4;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   background:
-    radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.14), transparent 52%),
-    linear-gradient(180deg, #131313 0%, #090909 100%);
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.12), transparent 54%),
+    linear-gradient(180deg, #151920 0%, #0a0c11 100%);
   box-shadow:
-    inset 0 0 30px rgba(0, 0, 0, 0.56),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    inset 0 0 28px rgba(0, 0, 0, 0.52),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .chance-track,
@@ -549,51 +542,54 @@ svg {
 }
 
 .chance-track {
-  background: repeating-conic-gradient(
+  z-index: 2;
+  background: conic-gradient(
     from -90deg,
-    rgba(255, 255, 255, 0.1) 0deg 0.9deg,
-    transparent 0.9deg 10deg
+    rgba(231, 240, 255, 0.96) 0deg,
+    rgba(192, 208, 234, 0.94) var(--chance-angle),
+    rgba(192, 208, 234, 0) calc(var(--chance-angle) + 8deg),
+    rgba(192, 208, 234, 0) 360deg
   );
   -webkit-mask: radial-gradient(
     farthest-side,
-    transparent calc(100% - 23px),
-    #000 calc(100% - 22px)
+    transparent calc(100% - 21px),
+    #000 calc(100% - 20px)
   );
   mask: radial-gradient(
     farthest-side,
-    transparent calc(100% - 23px),
-    #000 calc(100% - 22px)
+    transparent calc(100% - 21px),
+    #000 calc(100% - 20px)
   );
-  opacity: 0.3;
+  opacity: 0.94;
+  filter: drop-shadow(0 0 10px rgba(205, 225, 255, 0.3));
+  transition: opacity 0.2s ease;
 }
 
 .chance-sheen {
-  background: radial-gradient(
-    72% 48% at 50% 0%,
-    rgba(255, 255, 255, 0.24),
-    rgba(255, 255, 255, 0.03) 62%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  opacity: 0.3;
+  inset: 21px;
+  z-index: 5;
+  background: radial-gradient(70% 48% at 50% 0%, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 100%);
+  opacity: 0.18;
 }
 
 .chance-ring.is-empty .chance-track {
-  opacity: 0.24;
+  opacity: 0;
+  filter: none;
 }
 
 .chance-ring.is-empty .chance-sheen {
-  opacity: 0.12;
+  opacity: 0.1;
 }
 
 .chance-orbit {
   position: absolute;
-  inset: 11px;
+  inset: 9px;
   border-radius: 50%;
   transform: rotate(0deg);
   transform-origin: center;
   will-change: transform;
   pointer-events: none;
-  z-index: 5;
+  z-index: 6;
 }
 
 .orbit-arrow {
@@ -605,52 +601,24 @@ svg {
   position: absolute;
   left: 50%;
   top: 0;
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
   border-radius: 999px;
   transform: translate(-50%, -50%);
   background:
-    radial-gradient(circle at 34% 30%, #ffffff 0 26%, #efefef 27% 54%, #c9c9c9 55% 100%);
+    radial-gradient(circle at 34% 30%, #ffffff 0 26%, #e4edf9 27% 56%, #b8c7dd 57% 100%);
   box-shadow:
-    0 0 0 2px #0f0f0f,
-    0 0 14px rgba(255, 255, 255, 0.32);
+    0 0 0 2px #10131a,
+    0 0 12px rgba(210, 226, 255, 0.36);
 }
 
 .chance-orbit::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: 50%;
-  background: conic-gradient(
-    from -90deg,
-    rgba(236, 246, 255, 0.95) 0deg,
-    rgba(255, 255, 255, 0.45) 18deg,
-    rgba(255, 255, 255, 0.08) 64deg,
-    rgba(255, 255, 255, 0) 148deg
-  );
-  -webkit-mask: radial-gradient(
-    farthest-side,
-    transparent calc(100% - 8px),
-    #000 calc(100% - 7px),
-    #000 calc(100% - 4px),
-    transparent calc(100% - 3px)
-  );
-  mask: radial-gradient(
-    farthest-side,
-    transparent calc(100% - 8px),
-    #000 calc(100% - 7px),
-    #000 calc(100% - 4px),
-    transparent calc(100% - 3px)
-  );
-}
-
-.chance-ring.is-empty .chance-orbit::after {
-  opacity: 0.28;
+  content: none;
 }
 
 .chance-core {
   position: relative;
-  z-index: 6;
+  z-index: 7;
   display: grid;
   justify-items: center;
   gap: 4px;
@@ -818,6 +786,7 @@ svg {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center center;
   opacity: 0.26;
   mix-blend-mode: screen;
   filter: saturate(1.05);
@@ -826,10 +795,11 @@ svg {
 .nft-media {
   position: absolute;
   left: 50%;
-  top: 54%;
+  top: 50%;
   width: 74%;
   height: 74%;
   object-fit: contain;
+  object-position: center center;
   transform: translate(-50%, -50%);
   filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.42));
   z-index: 3;
@@ -842,7 +812,7 @@ video.nft-media {
 .nft-media-fallback {
   position: absolute;
   left: 50%;
-  top: 54%;
+  top: 50%;
   transform: translate(-50%, -50%);
   width: 52px;
   height: 52px;
@@ -1014,6 +984,7 @@ video.nft-media {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center center;
 }
 
 .profile-meta {
@@ -1127,7 +1098,7 @@ video.nft-media {
 
 .wallet-btn {
   width: 100%;
-  height: 44px;
+  height: 46px;
   border: 1px solid rgba(113, 184, 255, 0.56);
   border-radius: 14px;
   background:
@@ -1136,9 +1107,13 @@ video.nft-media {
     linear-gradient(180deg, rgba(20, 30, 46, 0.86), rgba(14, 19, 30, 0.86));
   color: var(--text-1);
   font-family: inherit;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 800;
   letter-spacing: -0.015em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
   cursor: pointer;
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease, filter 0.25s ease;
 }
@@ -1161,24 +1136,33 @@ video.nft-media {
 }
 
 .wallet-btn-inner {
-  width: 100%;
-  display: inline-flex;
+  width: auto;
+  max-width: 100%;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 9px;
+  margin: 0 auto;
+  line-height: 1;
 }
 
 .wallet-btn-icon {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: block;
+  transform: translateY(0.5px);
+  filter: drop-shadow(0 0 6px rgba(95, 188, 255, 0.35));
 }
 
 .wallet-btn-icon path {
-  fill: currentColor;
+  fill: #eaf6ff;
 }
 
 .wallet-btn-text {
+  display: block;
   line-height: 1;
+  transform: translateY(0.5px);
 }
 
 .wallet-short {
@@ -1351,18 +1335,21 @@ video.nft-media {
   }
 
   .chance-ring::before,
-  .chance-track,
-  .chance-sheen {
-    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 22px), #000 calc(100% - 21px));
-    mask: radial-gradient(farthest-side, transparent calc(100% - 22px), #000 calc(100% - 21px));
+  .chance-track {
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 20px), #000 calc(100% - 19px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 20px), #000 calc(100% - 19px));
   }
 
   .chance-ring::after {
-    inset: 22px;
+    inset: 21px;
+  }
+
+  .chance-sheen {
+    inset: 20px;
   }
 
   .chance-orbit {
-    inset: 10px;
+    inset: 8px;
   }
 
   .block-title {
