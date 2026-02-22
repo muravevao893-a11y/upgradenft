@@ -1531,9 +1531,52 @@ async function fetchUnifiedTelegramGiftItems({ userId = "", username = "", walle
   return dedupeGifts(merged);
 }
 
-async function buildMarketState({ userId = "", username = "", wallet = "", chain = "" }) {
+async function buildWalletInventoryState({ userId = "", username = "", wallet = "", chain = "" }) {
   const ownerAddress = normalizeTonAddress(wallet);
   const ownItems = ownerAddress ? await fetchAccountNftItems(ownerAddress, chain) : [];
+
+  const profileInventory = [];
+  const inventory = [];
+
+  safeArray(ownItems).forEach((item, index) => {
+    const listedPriceTon = parseTonPriceNode(item?.sale?.price);
+    const profileItem = buildNftModelFromTonapiItem(
+      item,
+      Number.isFinite(listedPriceTon) ? listedPriceTon : NaN,
+      `owned-lite-${index + 1}`,
+      "wallet",
+    );
+    if (!profileItem) return;
+
+    profileInventory.push(profileItem);
+    if (Number.isFinite(listedPriceTon) && listedPriceTon > 0) {
+      inventory.push({ ...profileItem, value: listedPriceTon, source: "wallet" });
+    }
+  });
+
+  const rawGifts = await fetchUnifiedTelegramGiftItems({
+    userId: String(userId || "").trim(),
+    username: String(username || "").trim(),
+    wallet: ownerAddress,
+  });
+  const telegramInventory = rawGifts
+    .map((item, index) => buildNftModelFromGift(item, index))
+    .filter(Boolean);
+  const pricedTelegramGifts = telegramInventory.filter((item) => Number.isFinite(toNumber(item?.value, NaN)) && item.value > 0);
+
+  return {
+    ownerAddress,
+    ownItems,
+    profileInventory: mergeUniqueNfts(profileInventory, telegramInventory),
+    inventory: mergeUniqueNfts(inventory, pricedTelegramGifts),
+    telegramGiftsRaw: rawGifts,
+  };
+}
+
+async function buildMarketState({ userId = "", username = "", wallet = "", chain = "" }) {
+  const inventoryState = await buildWalletInventoryState({ userId, username, wallet, chain });
+  const ownerAddress = inventoryState.ownerAddress;
+  const ownItems = safeArray(inventoryState.ownItems);
   const uniqueCollections = Array.from(
     new Set(
       safeArray(ownItems)
@@ -1560,19 +1603,8 @@ async function buildMarketState({ userId = "", username = "", wallet = "", chain
   });
 
   const { profileInventory, inventory } = buildOwnedInventoryLists(ownItems, floorByCollection, "owned", "wallet");
-
-  const rawGifts = await fetchUnifiedTelegramGiftItems({
-    userId: String(userId || "").trim(),
-    username: String(username || "").trim(),
-    wallet: ownerAddress,
-  });
-  const telegramInventory = rawGifts
-    .map((item, index) => buildNftModelFromGift(item, index))
-    .filter(Boolean);
-  const pricedTelegramGifts = telegramInventory.filter((item) => Number.isFinite(toNumber(item?.value, NaN)) && item.value > 0);
-
-  const profileMerged = mergeUniqueNfts(profileInventory, telegramInventory);
-  const inventoryMerged = mergeUniqueNfts(inventory, pricedTelegramGifts);
+  const profileMerged = mergeUniqueNfts(profileInventory, safeArray(inventoryState.profileInventory));
+  const inventoryMerged = mergeUniqueNfts(inventory, safeArray(inventoryState.inventory));
 
   let targets = Array.from(targetMap.values())
     .filter((item) => Number.isFinite(toNumber(item?.value, NaN)) && item.value > 0)
@@ -1591,7 +1623,7 @@ async function buildMarketState({ userId = "", username = "", wallet = "", chain
     profileInventory: profileMerged,
     inventory: inventoryMerged,
     targets,
-    telegramGiftsRaw: rawGifts,
+    telegramGiftsRaw: inventoryState.telegramGiftsRaw,
   };
 }
 
@@ -1910,6 +1942,40 @@ async function handleWalletBalance(reqUrl, res) {
   });
 }
 
+async function handleWalletNfts(reqUrl, res) {
+  const userId = String(reqUrl.searchParams.get("user_id") || "").trim();
+  const username = String(reqUrl.searchParams.get("username") || "").trim();
+  const wallet = firstNonEmptyString(
+    reqUrl.searchParams.get("wallet"),
+    reqUrl.searchParams.get("wallet_address"),
+    reqUrl.searchParams.get("connected_wallet"),
+  );
+  const chain = String(reqUrl.searchParams.get("chain") || "").trim();
+
+  if (!wallet) {
+    sendJson(res, 400, { ok: false, error_code: "bad_request", error: "Missing wallet" });
+    return;
+  }
+
+  const inventoryState = await buildWalletInventoryState({
+    userId,
+    username,
+    wallet,
+    chain,
+  });
+
+  sendJson(res, 200, {
+    ok: true,
+    user_id: userId || null,
+    username: username || null,
+    wallet: wallet || null,
+    chain: normalizeTonChainId(chain) || null,
+    profile_inventory: inventoryState.profileInventory,
+    inventory: inventoryState.inventory,
+    telegram_gifts_count: safeArray(inventoryState.telegramGiftsRaw).length,
+  });
+}
+
 async function handleBankTargets(reqUrl, res) {
   const chain = String(reqUrl.searchParams.get("chain") || "").trim();
   const targets = await fetchBankWalletTargets(chain);
@@ -2010,6 +2076,11 @@ const server = http.createServer(async (req, res) => {
 
   if (method === "GET" && (path === "/wallet/balance" || path === "/api/wallet/balance")) {
     await handleWalletBalance(reqUrl, res);
+    return;
+  }
+
+  if (method === "GET" && (path === "/wallet/nfts" || path === "/api/wallet/nfts")) {
+    await handleWalletNfts(reqUrl, res);
     return;
   }
 

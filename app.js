@@ -1,4 +1,4 @@
-﻿const APP_VERSION = "2026-02-22-80";
+﻿const APP_VERSION = "2026-02-22-84";
 
 const tabMeta = {
   tasks: {
@@ -78,13 +78,28 @@ const UPGRADE_API_BASE = (() => {
     // Ignore storage errors.
   }
 
+  try {
+    const host = String(window.location?.hostname || "").trim().toLowerCase();
+    const protocol = String(window.location?.protocol || "https:").trim();
+    if (host === "localhost" || host === "127.0.0.1") {
+      return `${protocol}//${host}:8787`;
+    }
+  } catch {
+    // Ignore URL access errors.
+  }
+
   return "";
 })();
 const BANK_WALLET_ADDRESS = String(
   window.__UPNFT_BANK_WALLET__
   || "UQCgQQSGPlFWr5TY8UVT7XvtkVtNkRPIGUEnFOB4gRZbQEu4",
 ).trim();
-const SECURE_UPGRADE_REQUIRED = window.__UPNFT_SECURE_UPGRADE_REQUIRED__ !== false;
+const SECURE_UPGRADE_REQUIRED = (() => {
+  const raw = window.__UPNFT_SECURE_UPGRADE_REQUIRED__;
+  if (raw === undefined || raw === null) return false;
+  const normalized = String(raw).trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || raw === true || raw === 1;
+})();
 const NFT_PAGE_LIMIT = 100;
 const NFT_MAX_PAGES = 4;
 const COLLECTION_SCAN_LIMIT = 60;
@@ -93,6 +108,10 @@ const MAX_TARGETS = 60;
 const HISTORY_LIMIT = 60;
 const RENDER_CHUNK_SIZE = 16;
 const STALE_MS = 120000;
+const WALLET_BALANCE_REFRESH_MS = 60000;
+const BACKEND_MARKET_TIMEOUT_MS = 30000;
+const BACKEND_MARKET_RETRY_TIMEOUT_MS = 45000;
+const BACKEND_INVENTORY_TIMEOUT_MS = 25000;
 const NFT_CARD_SPAM_WINDOW_MS = 1000;
 const NFT_CARD_MAX_TAPS_PER_WINDOW = 14;
 const NFT_CARD_SPAM_LOCK_MS = 900;
@@ -617,6 +636,7 @@ const LOCAL_KEYS = {
   fair: "upnft_fair_v2",
   locale: "upnft_locale_v1",
   upgradeGuard: "upnft_upgrade_guard_v1",
+  walletUser: "upnft_wallet_user_v1",
 };
 
 const state = {
@@ -653,6 +673,7 @@ const state = {
   refreshTelegramGifts: null,
   openWalletModal: null,
   refreshWalletLocale: null,
+  handleTelegramUserChanged: null,
   orbitAngle: 0,
   isSpinning: false,
   spinRafId: null,
@@ -1729,6 +1750,29 @@ function writeLocalJson(key, value) {
   }
 }
 
+function readLocalString(key, fallback = "") {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null || raw === undefined) return fallback;
+    return String(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+function writeLocalString(key, value) {
+  try {
+    const normalized = String(value ?? "").trim();
+    if (!normalized) {
+      localStorage.removeItem(key);
+      return;
+    }
+    localStorage.setItem(key, normalized);
+  } catch {
+    // Ignore storage/private mode errors.
+  }
+}
+
 function createUpgradeError(code, message = "") {
   const safeCode = String(code || "upgrade_error");
   const error = new Error(message || safeCode);
@@ -2759,7 +2803,7 @@ async function fetchBackendMarketState(address, chain = "") {
   if (!UPGRADE_API_BASE) return null;
   const wallet = normalizeTonAddress(address);
   if (!wallet) return null;
-  const payload = await fetchUpgradeApiJson("/market/state", {
+  const query = {
     user_id: state.currentUser?.id ?? "",
     username: state.currentUser?.username ?? "",
     wallet,
@@ -2770,7 +2814,12 @@ async function fetchBackendMarketState(address, chain = "") {
     upgraded_only: "1",
     include_profile: "1",
     include_wallet: "1",
-  });
+  };
+
+  let payload = await fetchUpgradeApiJson("/market/state", query, BACKEND_MARKET_TIMEOUT_MS);
+  if (!payload) {
+    payload = await fetchUpgradeApiJson("/market/state", query, BACKEND_MARKET_RETRY_TIMEOUT_MS);
+  }
   if (!payload || payload.ok === false) return null;
   const profileInventory = normalizeNftList(
     payload.profile_inventory ?? payload.profileInventory ?? [],
@@ -2793,6 +2842,42 @@ async function fetchBackendMarketState(address, chain = "") {
     profileInventory,
     inventory,
     targets,
+  };
+}
+
+async function fetchBackendWalletInventory(address, chain = "") {
+  if (!UPGRADE_API_BASE) return null;
+  const wallet = normalizeTonAddress(address);
+  if (!wallet) return null;
+  const payload = await fetchUpgradeApiJson(
+    "/wallet/nfts",
+    {
+      user_id: state.currentUser?.id ?? "",
+      username: state.currentUser?.username ?? "",
+      wallet,
+      wallet_address: wallet,
+      connected_wallet: wallet,
+      chain: normalizeTonChainId(chain),
+      include_upgraded: "1",
+      upgraded_only: "1",
+      include_profile: "1",
+      include_wallet: "1",
+    },
+    BACKEND_INVENTORY_TIMEOUT_MS,
+  );
+  if (!payload || payload.ok === false) return null;
+
+  return {
+    profileInventory: normalizeNftList(
+      payload.profile_inventory ?? payload.profileInventory ?? [],
+      "api-wallet-prof",
+      { allowMissingPrice: true },
+    ),
+    inventory: normalizeNftList(
+      payload.inventory ?? payload.owned_inventory ?? payload.ownedInventory ?? [],
+      "api-wallet-inv",
+    ),
+    targets: [],
   };
 }
 
@@ -4575,16 +4660,31 @@ async function fetchWalletMarketData(address, chain = "") {
     };
   }
 
+  const backendInventoryState = await fetchBackendWalletInventory(ownerAddress, chain);
+  const backendFallbackHasInventoryData = Boolean(
+    backendInventoryState
+    && (
+      safeArray(backendInventoryState.profileInventory).length > 0
+      || safeArray(backendInventoryState.inventory).length > 0
+    ),
+  );
+  if (backendFallbackHasInventoryData) {
+    return {
+      profileInventory: safeArray(backendInventoryState.profileInventory),
+      inventory: safeArray(backendInventoryState.inventory),
+      targets: [],
+    };
+  }
+
   const backendState = await fetchBackendMarketState(ownerAddress, chain);
-  const backendHasData = Boolean(
+  const backendHasInventoryData = Boolean(
     backendState
     && (
       safeArray(backendState.profileInventory).length > 0
       || safeArray(backendState.inventory).length > 0
-      || safeArray(backendState.targets).length > 0
     ),
   );
-  if (backendHasData) {
+  if (backendHasInventoryData) {
     return backendState;
   }
 
@@ -6197,6 +6297,9 @@ function setupTelegramUser() {
         if (typeof state.refreshWalletData === "function" && state.tonAddress) {
           void state.refreshWalletData();
         }
+        if (typeof state.handleTelegramUserChanged === "function") {
+          void state.handleTelegramUserChanged(nextUserId, prevUserId);
+        }
       }
       return true;
     };
@@ -6234,6 +6337,23 @@ function setupTonConnect() {
   let balanceRequestToken = 0;
   let nftRefreshTimer = null;
   let nftRequestToken = 0;
+  let walletSwitchGuard = false;
+
+  const getCurrentTelegramUserId = () => String(state.currentUser?.id ?? "").trim();
+  const getBoundWalletUserId = () => String(readLocalString(LOCAL_KEYS.walletUser, "") || "").trim();
+  const setBoundWalletUserId = (userId) => writeLocalString(LOCAL_KEYS.walletUser, String(userId || "").trim());
+
+  const forceDisconnectStaleWallet = async () => {
+    if (walletSwitchGuard || !state.tonConnectUI) return;
+    walletSwitchGuard = true;
+    try {
+      await state.tonConnectUI.disconnect();
+    } catch (error) {
+      console.warn("Stale wallet session disconnect failed:", error);
+    } finally {
+      walletSwitchGuard = false;
+    }
+  };
 
   const setWalletButtonText = (label) => {
     const textNode = connectButton.querySelector(".wallet-btn-text");
@@ -6297,10 +6417,14 @@ function setupTonConnect() {
 
   state.refreshWalletLocale = refreshWalletLocale;
 
-  const loadWalletBalance = async (address, chain = state.tonChain) => {
+  const loadWalletBalance = async (address, chain = state.tonChain, options = {}) => {
     const token = ++balanceRequestToken;
-    state.walletUi.balanceLoading = true;
-    walletBubbleBalance.textContent = t("wallet_balance_loading");
+    const hasCachedBalance = Boolean(String(state.walletUi.lastBalanceText || "").trim());
+    const showLoading = options.showLoading === true || (!hasCachedBalance && options.showLoading !== false);
+    state.walletUi.balanceLoading = showLoading;
+    if (showLoading) {
+      walletBubbleBalance.textContent = t("wallet_balance_loading");
+    }
     const balance = await fetchWalletTonBalance(address, chain);
     if (token !== balanceRequestToken) return;
     state.walletUi.balanceLoading = false;
@@ -6333,10 +6457,10 @@ function setupTonConnect() {
 
   const startBalancePolling = (address, chain = state.tonChain) => {
     stopBalancePolling();
-    void loadWalletBalance(address, chain);
+    void loadWalletBalance(address, chain, { showLoading: true });
     balanceRefreshTimer = window.setInterval(() => {
-      void loadWalletBalance(address, chain);
-    }, 30000);
+      void loadWalletBalance(address, chain, { showLoading: false });
+    }, WALLET_BALANCE_REFRESH_MS);
   };
 
   const stopNftPolling = () => {
@@ -6514,14 +6638,21 @@ function setupTonConnect() {
 
   state.refreshWalletData = async () => {
     if (!state.tonAddress) return;
-    await loadWalletBalance(state.tonAddress, state.tonChain);
+    await loadWalletBalance(state.tonAddress, state.tonChain, { showLoading: false });
     await loadWalletNfts(state.tonAddress, state.tonChain);
   };
 
   const paintConnectionState = (wallet) => {
     const address = wallet?.account?.address || state.tonConnectUI?.account?.address || "";
     const chain = normalizeTonChainId(wallet?.account?.chain || state.tonConnectUI?.wallet?.account?.chain || "");
-    const connected = Boolean(address);
+    const userId = getCurrentTelegramUserId();
+    const boundUserId = getBoundWalletUserId();
+    const staleBoundWallet = Boolean(address && userId && boundUserId && boundUserId !== userId);
+    if (staleBoundWallet) {
+      setBoundWalletUserId("");
+      void forceDisconnectStaleWallet();
+    }
+    const connected = Boolean(address) && !staleBoundWallet;
 
     setWalletButtonKey("wallet_connect");
     connectButton.classList.toggle("hidden", connected);
@@ -6537,6 +6668,9 @@ function setupTonConnect() {
         state.walletUi.lastBalanceText = "";
         state.walletUi.lastPositiveBalanceAt = 0;
       }
+      if (userId) {
+        setBoundWalletUserId(userId);
+      }
 
       setWalletShort("wallet_syncing_nft");
       startBalancePolling(address, chain);
@@ -6550,6 +6684,7 @@ function setupTonConnect() {
       state.walletUi.lastBalanceText = "";
       state.walletUi.lastPositiveBalanceAt = 0;
       walletBubbleBalance.textContent = "-- TON";
+      setBoundWalletUserId("");
       setWalletShort("wallet_not_connected");
       void loadAppData().then(() => {
         renderAll();
@@ -6560,6 +6695,9 @@ function setupTonConnect() {
   };
 
   paintConnectionState(state.tonConnectUI.wallet);
+  state.handleTelegramUserChanged = async () => {
+    paintConnectionState(state.tonConnectUI?.wallet || null);
+  };
 
   state.tonConnectUI.onStatusChange(
     (wallet) => paintConnectionState(wallet),
@@ -6568,7 +6706,7 @@ function setupTonConnect() {
 
   const refreshOnVisibility = () => {
     if (!state.tonAddress || document.hidden) return;
-    void loadWalletBalance(state.tonAddress, state.tonChain);
+    void loadWalletBalance(state.tonAddress, state.tonChain, { showLoading: false });
     void loadWalletNfts(state.tonAddress, state.tonChain);
   };
   document.addEventListener("visibilitychange", refreshOnVisibility);
