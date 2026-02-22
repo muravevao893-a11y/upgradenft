@@ -67,7 +67,7 @@ const state = {
   spinRafId: null,
 };
 
-const APP_VERSION = "2026-02-22-3";
+const APP_VERSION = "2026-02-22-4";
 
 const fallbackUser = {
   id: null,
