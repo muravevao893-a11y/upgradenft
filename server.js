@@ -23,6 +23,13 @@ const TONCENTER_TESTNET_BASE = String(process.env.TONCENTER_TESTNET_BASE || "htt
 const TONAPI_TIMEOUT_MS = clamp(toInt(process.env.TONAPI_TIMEOUT_MS, 12000), 3000, 30000);
 const TELEGRAM_GIFTS_PROVIDER_URL = String(process.env.TELEGRAM_GIFTS_PROVIDER_URL || "").trim();
 const TELEGRAM_GIFTS_PROVIDER_TOKEN = String(process.env.TELEGRAM_GIFTS_PROVIDER_TOKEN || "").trim();
+const TELEGRAM_BOT_TOKEN = String(process.env.TELEGRAM_BOT_TOKEN || "").trim();
+const TELEGRAM_BOT_API_BASE = String(process.env.TELEGRAM_BOT_API_BASE || "https://api.telegram.org").replace(/\/$/, "");
+const TELEGRAM_BOT_TIMEOUT_MS = clamp(toInt(process.env.TELEGRAM_BOT_TIMEOUT_MS, 12000), 3000, 30000);
+const TELEGRAM_BOT_GIFTS_LIMIT = clamp(toInt(process.env.TELEGRAM_BOT_GIFTS_LIMIT, 100), 1, 100);
+const TELEGRAM_BOT_GIFTS_MAX_PAGES = clamp(toInt(process.env.TELEGRAM_BOT_GIFTS_MAX_PAGES, 4), 1, 10);
+const TELEGRAM_BOT_GIFTS_CACHE_MS = clamp(toInt(process.env.TELEGRAM_BOT_GIFTS_CACHE_MS, 20000), 2000, 120000);
+const TELEGRAM_FILE_CACHE_TTL_MS = clamp(toInt(process.env.TELEGRAM_FILE_CACHE_TTL_MS, 600000), 30000, 3600000);
 const NFT_PAGE_LIMIT = clamp(toInt(process.env.NFT_PAGE_LIMIT, 100), 20, 200);
 const NFT_MAX_PAGES = clamp(toInt(process.env.NFT_MAX_PAGES, 4), 1, 10);
 const COLLECTION_SCAN_LIMIT = clamp(toInt(process.env.COLLECTION_SCAN_LIMIT, 60), 20, 200);
@@ -37,6 +44,8 @@ const sessions = new Map();
 const requestIndex = new Map();
 const walletState = new Map();
 const profileGiftStore = new Map();
+const telegramUserGiftsCache = new Map();
+const telegramFilePathCache = new Map();
 let sqliteDb = null;
 let sqliteEnabled = false;
 const sqliteStmt = {
@@ -399,6 +408,88 @@ function dedupeGifts(list) {
   return Array.from(map.values());
 }
 
+function parseJsonObjectStrict(rawValue) {
+  const raw = String(rawValue ?? "").trim();
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeDecodeURIComponentText(rawValue) {
+  const raw = String(rawValue ?? "");
+  if (!raw) return "";
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function parseTelegramIdentityCandidate(rawValue) {
+  const raw = String(rawValue ?? "").trim();
+  if (!raw) return null;
+
+  const variants = [
+    raw,
+    safeDecodeURIComponentText(raw),
+    safeDecodeURIComponentText(safeDecodeURIComponentText(raw)),
+  ];
+
+  for (const variant of variants) {
+    const parsed = parseJsonObjectStrict(variant);
+    if (!parsed || typeof parsed !== "object") continue;
+
+    if (parsed.user && typeof parsed.user === "object" && parsed.user.id !== undefined && parsed.user.id !== null) {
+      return parsed.user;
+    }
+    if (parsed.receiver && typeof parsed.receiver === "object" && parsed.receiver.id !== undefined && parsed.receiver.id !== null) {
+      return parsed.receiver;
+    }
+    if (parsed.id !== undefined && parsed.id !== null) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function parseTelegramUserFromInitDataValue(initDataRaw) {
+  const initData = String(initDataRaw ?? "").trim();
+  if (!initData) return null;
+
+  let params;
+  try {
+    params = new URLSearchParams(initData);
+  } catch {
+    return null;
+  }
+
+  const directKeys = ["user", "receiver"];
+  for (const key of directKeys) {
+    const value = String(params.get(key) || "").trim();
+    const parsed = parseTelegramIdentityCandidate(value);
+    if (parsed) return parsed;
+  }
+
+  const tgData = String(params.get("tgWebAppData") || "").trim();
+  if (tgData) {
+    const fromTgData = parseTelegramUserFromInitDataValue(safeDecodeURIComponentText(tgData));
+    if (fromTgData) return fromTgData;
+  }
+
+  return null;
+}
+
+function resolveTelegramUserFromHeaders(req) {
+  const initData = String(req?.headers?.["x-telegram-init-data"] || "").trim();
+  if (!initData) return null;
+  return parseTelegramUserFromInitDataValue(initData);
+}
+
 function getProfileStoredGifts(userId) {
   const key = String(userId || "").trim();
   if (!key) return [];
@@ -675,6 +766,310 @@ async function fetchProviderGifts(reqUrl) {
   const payload = await fetchJson(providerUrl.toString(), TONAPI_TIMEOUT_MS, headers);
   const items = extractGiftItems(payload);
   return dedupeGifts(items);
+}
+
+function buildTelegramBotApiUrl(method, params = {}) {
+  if (!TELEGRAM_BOT_TOKEN) return "";
+  const methodName = String(method || "").trim();
+  if (!methodName) return "";
+
+  let url;
+  try {
+    url = new URL(`${TELEGRAM_BOT_API_BASE}/bot${TELEGRAM_BOT_TOKEN}/${methodName}`);
+  } catch {
+    return "";
+  }
+
+  const entries = params && typeof params === "object" ? Object.entries(params) : [];
+  entries.forEach(([key, rawValue]) => {
+    if (rawValue === undefined || rawValue === null) return;
+    const value = String(rawValue).trim();
+    if (!value) return;
+    url.searchParams.set(key, value);
+  });
+  return url.toString();
+}
+
+async function fetchTelegramBotApi(method, params = {}, timeoutMs = TELEGRAM_BOT_TIMEOUT_MS) {
+  const url = buildTelegramBotApiUrl(method, params);
+  if (!url) return null;
+  return fetchJson(url, timeoutMs);
+}
+
+function toTelegramFileRef(fileId) {
+  const id = String(fileId || "").trim();
+  if (!id) return "";
+  return `tgfile:${id}`;
+}
+
+function normalizeTelegramColorInt(value) {
+  const numeric = toNumber(value, NaN);
+  if (!Number.isFinite(numeric)) return "";
+  const normalized = Math.max(0, Math.min(0xffffff, Math.floor(numeric)));
+  return `#${normalized.toString(16).padStart(6, "0")}`;
+}
+
+function resolveTelegramGiftBackgroundColor(ownedGift) {
+  const directColor = normalizeColorValue(firstNonEmptyStringFromPaths(ownedGift, [
+    "gift.background_color",
+    "gift.backgroundColor",
+    "gift.backdrop.background_color",
+    "gift.backdrop.backgroundColor",
+    "gift.backdrop.center_color",
+    "gift.backdrop.centerColor",
+  ]));
+  if (directColor) return directColor;
+
+  const intColor = firstMeaningfulValueFromPaths(ownedGift, [
+    "gift.backdrop.center_color",
+    "gift.backdrop.centerColor",
+    "gift.backdrop.edge_color",
+    "gift.backdrop.edgeColor",
+    "gift.backdrop.pattern_color",
+    "gift.backdrop.patternColor",
+  ]);
+  return normalizeTelegramColorInt(intColor);
+}
+
+function resolveTelegramGiftPriceTon(ownedGift) {
+  const currencyHint = String(firstNonEmptyStringFromPaths(ownedGift, [
+    "price.currency",
+    "price.currency_code",
+    "price.token",
+    "gift.price.currency",
+    "gift.price.currency_code",
+  ])).trim().toUpperCase();
+  if (currencyHint && currencyHint !== "TON") return NaN;
+
+  let priceTon = parseLooseTonValue(firstMeaningfulValueFromPaths(ownedGift, [
+    "price_ton",
+    "priceTon",
+    "price",
+    "price.amount",
+    "price.value",
+    "gift.price_ton",
+    "gift.priceTon",
+    "gift.price",
+    "gift.price.amount",
+    "gift.price.value",
+    "gift.market_price_ton",
+    "gift.market.price",
+    "gift.last_resale_price_ton",
+    "gift.last_resale.price",
+  ]));
+  if (Number.isFinite(priceTon) && priceTon > 1000000) {
+    priceTon /= 1000000000;
+  }
+  return Number.isFinite(priceTon) && priceTon > 0 ? priceTon : NaN;
+}
+
+function resolveTelegramGiftDisplayName(ownedGift) {
+  const baseName = String(firstNonEmptyStringFromPaths(ownedGift, [
+    "gift.base_name",
+    "gift.name",
+    "gift.title",
+    "name",
+    "title",
+  ]) || "Telegram Gift").trim() || "Telegram Gift";
+
+  const number = String(firstNonEmptyStringFromPaths(ownedGift, [
+    "gift.number",
+    "number",
+    "gift.unique_gift_number",
+    "unique_gift_number",
+  ])).trim();
+  if (number && !baseName.includes("#")) {
+    return `${baseName} #${number}`;
+  }
+  return baseName;
+}
+
+function isLikelyTelegramUpgradedGift(ownedGift) {
+  if (!ownedGift || typeof ownedGift !== "object") return false;
+  const giftType = String(ownedGift?.type ?? "").trim().toLowerCase();
+  if (giftType === "unique") return true;
+  if (resolveBooleanFromPaths(ownedGift, [
+    "gift.is_from_blockchain",
+    "gift.isFromBlockchain",
+    "is_from_blockchain",
+    "isFromBlockchain",
+  ])) {
+    return true;
+  }
+  if (String(firstNonEmptyStringFromPaths(ownedGift, [
+    "gift.number",
+    "gift.nft_address",
+    "gift.nftAddress",
+    "gift.nft.address",
+  ])).trim()) {
+    return true;
+  }
+  return false;
+}
+
+function mapTelegramBotOwnedGiftToGift(ownedGift, index = 0) {
+  if (!ownedGift || typeof ownedGift !== "object") return null;
+  if (!isLikelyTelegramUpgradedGift(ownedGift)) return null;
+
+  const giftId = firstNonEmptyStringFromPaths(ownedGift, [
+    "owned_gift_id",
+    "gift.owned_gift_id",
+    "gift.gift_id",
+    "gift.id",
+    "gift.number",
+    "gift.nft_address",
+    "gift.nftAddress",
+    "gift.nft.address",
+    "id",
+  ]) || `tg-bot-${index + 1}`;
+
+  const imageFileId = firstNonEmptyStringFromPaths(ownedGift, [
+    "gift.model.sticker.thumbnail.file_id",
+    "gift.symbol.sticker.thumbnail.file_id",
+    "gift.sticker.thumbnail.file_id",
+    "gift.model.sticker.file_id",
+    "gift.symbol.sticker.file_id",
+    "gift.sticker.file_id",
+  ]);
+  const animationFileId = firstNonEmptyStringFromPaths(ownedGift, [
+    "gift.model.sticker.premium_animation.file_id",
+    "gift.symbol.sticker.premium_animation.file_id",
+    "gift.sticker.premium_animation.file_id",
+    "gift.model.sticker.animation.file_id",
+    "gift.symbol.sticker.animation.file_id",
+    "gift.sticker.animation.file_id",
+    "gift.model.sticker.video.file_id",
+    "gift.symbol.sticker.video.file_id",
+    "gift.sticker.video.file_id",
+  ]);
+
+  const imageUrl = toTelegramFileRef(imageFileId);
+  const animationUrl = toTelegramFileRef(animationFileId);
+  const priceTon = resolveTelegramGiftPriceTon(ownedGift);
+  const tier = String(firstNonEmptyStringFromPaths(ownedGift, [
+    "gift.rarity",
+    "gift.model.rarity",
+    "gift.symbol.rarity",
+  ]) || (String(ownedGift?.type || "").toLowerCase() === "unique" ? "Legendary" : "Rare")).trim();
+
+  const mapped = {
+    id: String(giftId),
+    gift_id: String(giftId),
+    name: resolveTelegramGiftDisplayName(ownedGift),
+    tier: tier || "Rare",
+    image_url: imageUrl || undefined,
+    animation_url: animationUrl || undefined,
+    background_color: resolveTelegramGiftBackgroundColor(ownedGift) || undefined,
+    is_upgraded: true,
+    is_from_blockchain: resolveBooleanFromPaths(ownedGift, [
+      "gift.is_from_blockchain",
+      "gift.isFromBlockchain",
+      "is_from_blockchain",
+      "isFromBlockchain",
+    ]),
+    source: "telegram-bot",
+    gift: ownedGift.gift ?? null,
+  };
+  if (Number.isFinite(priceTon)) {
+    mapped.price_ton = priceTon;
+  }
+  return mapped;
+}
+
+function getCachedTelegramUserGifts(userId) {
+  const key = String(userId || "").trim();
+  if (!key) return null;
+  const cached = telegramUserGiftsCache.get(key);
+  if (!cached || !Array.isArray(cached.items)) return null;
+  if (toInt(cached.expiresAt, 0) <= now()) {
+    telegramUserGiftsCache.delete(key);
+    return null;
+  }
+  return cached.items;
+}
+
+function setCachedTelegramUserGifts(userId, items) {
+  const key = String(userId || "").trim();
+  if (!key) return;
+  telegramUserGiftsCache.set(key, {
+    items: safeArray(items),
+    expiresAt: now() + TELEGRAM_BOT_GIFTS_CACHE_MS,
+  });
+}
+
+async function fetchTelegramBotUserGifts(userId) {
+  const normalizedUserId = String(userId || "").trim();
+  if (!TELEGRAM_BOT_TOKEN || !normalizedUserId) return [];
+  if (!/^-?\d+$/.test(normalizedUserId)) return [];
+
+  const cached = getCachedTelegramUserGifts(normalizedUserId);
+  if (cached) return dedupeGifts(cached);
+
+  const collected = [];
+  let offset = "";
+
+  for (let page = 0; page < TELEGRAM_BOT_GIFTS_MAX_PAGES; page += 1) {
+    const payload = await fetchTelegramBotApi("getUserGifts", {
+      user_id: normalizedUserId,
+      limit: TELEGRAM_BOT_GIFTS_LIMIT,
+      sort_by_price: "true",
+      ...(offset ? { offset } : {}),
+    });
+    if (!payload || payload.ok !== true) break;
+
+    const gifts = safeArray(payload?.result?.gifts);
+    if (gifts.length === 0) break;
+    gifts.forEach((item, index) => {
+      const mapped = mapTelegramBotOwnedGiftToGift(item, collected.length + index);
+      if (mapped) collected.push(mapped);
+    });
+
+    const nextOffset = String(payload?.result?.next_offset || "").trim();
+    if (!nextOffset || nextOffset === offset) break;
+    offset = nextOffset;
+  }
+
+  const deduped = dedupeGifts(collected);
+  setCachedTelegramUserGifts(normalizedUserId, deduped);
+  return deduped;
+}
+
+function getCachedTelegramFilePath(fileId) {
+  const key = String(fileId || "").trim();
+  if (!key) return "";
+  const cached = telegramFilePathCache.get(key);
+  if (!cached || !cached.path) return "";
+  if (toInt(cached.expiresAt, 0) <= now()) {
+    telegramFilePathCache.delete(key);
+    return "";
+  }
+  return String(cached.path).trim();
+}
+
+function setCachedTelegramFilePath(fileId, filePath) {
+  const key = String(fileId || "").trim();
+  const pathValue = String(filePath || "").trim();
+  if (!key || !pathValue) return;
+  telegramFilePathCache.set(key, {
+    path: pathValue,
+    expiresAt: now() + TELEGRAM_FILE_CACHE_TTL_MS,
+  });
+}
+
+async function resolveTelegramBotFilePath(fileId) {
+  const normalizedFileId = String(fileId || "").trim();
+  if (!TELEGRAM_BOT_TOKEN || !normalizedFileId) return "";
+
+  const cached = getCachedTelegramFilePath(normalizedFileId);
+  if (cached) return cached;
+
+  const payload = await fetchTelegramBotApi("getFile", { file_id: normalizedFileId }, TELEGRAM_BOT_TIMEOUT_MS);
+  if (!payload || payload.ok !== true) return "";
+
+  const filePath = String(payload?.result?.file_path || "").trim();
+  if (!filePath) return "";
+  setCachedTelegramFilePath(normalizedFileId, filePath);
+  return filePath;
 }
 
 function readJsonBody(req) {
@@ -1516,6 +1911,11 @@ async function fetchUnifiedTelegramGiftItems({ userId = "", username = "", walle
   merged.push(...safeArray(injectedGifts));
   merged.push(...getProfileStoredGifts(userId));
 
+  const botItems = await fetchTelegramBotUserGifts(userId);
+  if (botItems.length > 0) {
+    merged.push(...botItems);
+  }
+
   const providerItems = await fetchProviderGifts(buildGiftRequestUrlLike({ userId, username, wallet }));
   if (providerItems.length > 0) {
     merged.push(...providerItems);
@@ -1921,6 +2321,22 @@ async function handleSetGifts(req, res) {
   sendJson(res, 200, { ok: true, user_id: userId, count: gifts.length });
 }
 
+function resolveTelegramIdentityFromRequest(req, reqUrl) {
+  const headerUser = resolveTelegramUserFromHeaders(req);
+  const userId = String(firstNonEmptyString(
+    reqUrl?.searchParams?.get("user_id"),
+    headerUser?.id,
+  )).trim();
+  const username = String(firstNonEmptyString(
+    reqUrl?.searchParams?.get("username"),
+    headerUser?.username,
+  )).trim();
+  return {
+    userId,
+    username,
+  };
+}
+
 async function handleWalletBalance(reqUrl, res) {
   const wallet = firstNonEmptyString(
     reqUrl.searchParams.get("wallet"),
@@ -1942,9 +2358,8 @@ async function handleWalletBalance(reqUrl, res) {
   });
 }
 
-async function handleWalletNfts(reqUrl, res) {
-  const userId = String(reqUrl.searchParams.get("user_id") || "").trim();
-  const username = String(reqUrl.searchParams.get("username") || "").trim();
+async function handleWalletNfts(req, reqUrl, res) {
+  const { userId, username } = resolveTelegramIdentityFromRequest(req, reqUrl);
   const wallet = firstNonEmptyString(
     reqUrl.searchParams.get("wallet"),
     reqUrl.searchParams.get("wallet_address"),
@@ -1976,6 +2391,14 @@ async function handleWalletNfts(reqUrl, res) {
   });
 }
 
+async function handleAuthWhoAmI(req, res) {
+  const user = resolveTelegramUserFromHeaders(req);
+  sendJson(res, 200, {
+    ok: true,
+    user: user && typeof user === "object" ? user : null,
+  });
+}
+
 async function handleBankTargets(reqUrl, res) {
   const chain = String(reqUrl.searchParams.get("chain") || "").trim();
   const targets = await fetchBankWalletTargets(chain);
@@ -1986,9 +2409,8 @@ async function handleBankTargets(reqUrl, res) {
   });
 }
 
-async function handleMarketState(reqUrl, res) {
-  const userId = String(reqUrl.searchParams.get("user_id") || "").trim();
-  const username = String(reqUrl.searchParams.get("username") || "").trim();
+async function handleMarketState(req, reqUrl, res) {
+  const { userId, username } = resolveTelegramIdentityFromRequest(req, reqUrl);
   const wallet = firstNonEmptyString(
     reqUrl.searchParams.get("wallet"),
     reqUrl.searchParams.get("wallet_address"),
@@ -2017,8 +2439,8 @@ async function handleMarketState(reqUrl, res) {
   });
 }
 
-async function handleGifts(reqUrl, res) {
-  const userId = String(reqUrl.searchParams.get("user_id") || "").trim();
+async function handleGifts(req, reqUrl, res) {
+  const { userId, username } = resolveTelegramIdentityFromRequest(req, reqUrl);
   const wallet = firstNonEmptyString(
     reqUrl.searchParams.get("wallet"),
     reqUrl.searchParams.get("wallet_address"),
@@ -2033,6 +2455,10 @@ async function handleGifts(reqUrl, res) {
   if (includeProfile) {
     merged.push(...safeArray(injectedGifts));
     merged.push(...getProfileStoredGifts(userId));
+    const botItems = await fetchTelegramBotUserGifts(userId);
+    if (botItems.length > 0) {
+      merged.push(...botItems);
+    }
     const providerItems = await fetchProviderGifts(reqUrl);
     if (providerItems.length > 0) {
       merged.push(...providerItems);
@@ -2049,10 +2475,79 @@ async function handleGifts(reqUrl, res) {
   sendJson(res, 200, {
     ok: true,
     user_id: userId || null,
+    username: username || null,
     wallet: wallet || null,
     source: sourceParam || "all",
     gifts,
   });
+}
+
+async function handleTelegramFile(reqUrl, res) {
+  if (!TELEGRAM_BOT_TOKEN) {
+    sendJson(res, 503, {
+      ok: false,
+      error_code: "bot_token_missing",
+      error: "Telegram bot token is not configured",
+    });
+    return;
+  }
+
+  const fileId = String(reqUrl.searchParams.get("file_id") || "").trim();
+  if (!fileId) {
+    sendJson(res, 400, {
+      ok: false,
+      error_code: "bad_request",
+      error: "Missing file_id",
+    });
+    return;
+  }
+
+  const filePath = await resolveTelegramBotFilePath(fileId);
+  if (!filePath) {
+    sendJson(res, 404, {
+      ok: false,
+      error_code: "file_not_found",
+      error: "Telegram file not found",
+    });
+    return;
+  }
+
+  const safeFilePath = filePath
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  const fileUrl = `${TELEGRAM_BOT_API_BASE}/file/bot${TELEGRAM_BOT_TOKEN}/${safeFilePath}`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TELEGRAM_BOT_TIMEOUT_MS);
+  try {
+    const response = await fetch(fileUrl, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      sendJson(res, 404, {
+        ok: false,
+        error_code: "file_download_failed",
+      });
+      return;
+    }
+
+    const fileBuffer = Buffer.from(await response.arrayBuffer());
+    setCorsHeaders(res);
+    res.statusCode = 200;
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.setHeader("Content-Type", response.headers.get("content-type") || "application/octet-stream");
+    res.end(fileBuffer);
+  } catch {
+    sendJson(res, 502, {
+      ok: false,
+      error_code: "file_proxy_failed",
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 initPersistentStorage();
@@ -2080,7 +2575,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (method === "GET" && (path === "/wallet/nfts" || path === "/api/wallet/nfts")) {
-    await handleWalletNfts(reqUrl, res);
+    await handleWalletNfts(req, reqUrl, res);
+    return;
+  }
+
+  if (method === "GET" && (path === "/auth/whoami" || path === "/api/auth/whoami")) {
+    await handleAuthWhoAmI(req, res);
     return;
   }
 
@@ -2090,16 +2590,33 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (method === "GET" && (path === "/market/state" || path === "/api/market/state")) {
-    await handleMarketState(reqUrl, res);
+    await handleMarketState(req, reqUrl, res);
     return;
   }
 
-  if (method === "GET" && (path === "/telegram/gifts" || path === "/telegram-gifts" || path === "/gifts")) {
-    await handleGifts(reqUrl, res);
+  if (method === "GET" && (
+    path === "/telegram/gifts"
+    || path === "/telegram-gifts"
+    || path === "/gifts"
+    || path === "/api/telegram/gifts"
+    || path === "/api/telegram-gifts"
+    || path === "/api/gifts"
+  )) {
+    await handleGifts(req, reqUrl, res);
     return;
   }
 
-  if (method === "POST" && (path === "/telegram/gifts/set" || path === "/telegram-gifts/set")) {
+  if (method === "GET" && (path === "/telegram/file" || path === "/api/telegram/file")) {
+    await handleTelegramFile(reqUrl, res);
+    return;
+  }
+
+  if (method === "POST" && (
+    path === "/telegram/gifts/set"
+    || path === "/telegram-gifts/set"
+    || path === "/api/telegram/gifts/set"
+    || path === "/api/telegram-gifts/set"
+  )) {
     await handleSetGifts(req, res);
     return;
   }

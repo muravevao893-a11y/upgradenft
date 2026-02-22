@@ -22,10 +22,15 @@ services:
       TONCENTER_TESTNET_BASE: "https://testnet.toncenter.com/api/v2"
       TONAPI_TIMEOUT_MS: "12000"
       MAX_TARGETS: "60"
+      TELEGRAM_BOT_TOKEN: "8535164087:AAEMst5LnaJk9rROkL371WfzJws4N18s7lw"
       # Optional external profile-gifts provider URL (returns gifts/items/result array).
       # TELEGRAM_GIFTS_PROVIDER_URL: "https://your-provider.example.com/telegram/gifts"
       # Optional bearer token for provider.
       # TELEGRAM_GIFTS_PROVIDER_TOKEN: ""
+      # Optional: Telegram Bot token for direct getUserGifts integration.
+      # TELEGRAM_BOT_TOKEN: "123456:ABCDEF..."
+      # Optional: custom Telegram Bot API base.
+      # TELEGRAM_BOT_API_BASE: "https://api.telegram.org"
       # Optional: put JSON array here for Telegram gifts endpoint.
       # TELEGRAM_GIFTS_JSON: "[]"
     volumes:

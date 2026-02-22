@@ -13,6 +13,7 @@ Minimal backend for your current Mini App frontend.
 - `GET /telegram/gifts`
 - `GET /telegram-gifts`
 - `GET /gifts`
+- `GET /telegram/file?file_id=...`
 - `POST /telegram/gifts/set`
 - `GET /health`
 
@@ -28,6 +29,7 @@ After restart, these entities are restored automatically.
 `/telegram/gifts` now merges data from:
 
 - `TELEGRAM_GIFTS_JSON` (static injected data)
+- Telegram Bot API `getUserGifts` (if `TELEGRAM_BOT_TOKEN` is set)
 - optional external provider (`TELEGRAM_GIFTS_PROVIDER_URL`)
 - TonAPI wallet NFTs fallback (if `wallet` query is provided)
 
@@ -77,6 +79,8 @@ If frontend and backend are on the same host, use that public backend URL instea
 ## Optional env for Telegram profile gifts
 
 - `DB_PATH` - SQLite path (default `./data/upnft.sqlite`)
+- `TELEGRAM_BOT_TOKEN` - enables direct Telegram profile gifts loading via Bot API
+- `TELEGRAM_BOT_API_BASE` - optional Bot API base (default `https://api.telegram.org`)
 - `TELEGRAM_GIFTS_PROVIDER_URL` - your API that returns `gifts`/`items`/`result` array for `user_id`
 - `TELEGRAM_GIFTS_PROVIDER_TOKEN` - optional Bearer token for that provider
 - `TONAPI_BASE` - default `https://tonapi.io/v2`

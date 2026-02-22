@@ -1,4 +1,4 @@
-﻿const APP_VERSION = "2026-02-22-84";
+﻿const APP_VERSION = "2026-02-22-85";
 
 const tabMeta = {
   tasks: {
@@ -163,6 +163,8 @@ const BOOT_SPLASH_MIN_MS = clamp(
   250,
   5000,
 );
+const TELEGRAM_USER_HYDRATE_MAX_RETRIES = 14;
+const TELEGRAM_USER_HYDRATE_BASE_DELAY_MS = 280;
 const TON_CHAIN_MAINNET = "-239";
 const TON_CHAIN_TESTNET = "-3";
 
@@ -1142,6 +1144,17 @@ function firstNonEmptyString(...values) {
 function normalizeMediaUrl(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
+  const apiBase = String(UPGRADE_API_BASE || "").trim().replace(/\/$/, "");
+  if (/^tgfile:/i.test(raw)) {
+    const fileId = raw.slice("tgfile:".length).trim();
+    if (!fileId) return "";
+    if (!apiBase) return "";
+    return `${apiBase}/telegram/file?file_id=${encodeURIComponent(fileId)}`;
+  }
+  if (apiBase && /^(\/)?(api\/)?telegram\/file\?/i.test(raw)) {
+    const normalizedPath = raw.startsWith("/") ? raw : `/${raw}`;
+    return `${apiBase}${normalizedPath}`;
+  }
   if (/^ipfs:\/\/ipfs\//i.test(raw)) {
     return `https://ipfs.io/ipfs/${raw.slice("ipfs://ipfs/".length)}`;
   }
@@ -6143,7 +6156,8 @@ function setAvatar(container, user) {
 
 function applyUserProfile(user) {
   const fullNameRaw = [user.first_name, user.last_name].filter(Boolean).join(" ");
-  const fullName = normalizeDisplayName(fullNameRaw) || t("guest_name");
+  const fallbackName = String(user.username ?? "").trim();
+  const fullName = normalizeDisplayName(fullNameRaw || fallbackName) || t("guest_name");
   const handle = user.username ? `@${String(user.username).trim()}` : "";
   const fullId = user?.id !== undefined && user?.id !== null ? String(user.id).trim() : "";
   const compactId = shortUserId(user.id);
@@ -6198,6 +6212,38 @@ function safeDecodeURIComponent(rawValue) {
   }
 }
 
+function parseTelegramIdentityCandidate(rawValue) {
+  const raw = String(rawValue ?? "").trim();
+  if (!raw) return null;
+
+  const variants = [
+    raw,
+    safeDecodeURIComponent(raw),
+    safeDecodeURIComponent(safeDecodeURIComponent(raw)),
+  ];
+
+  for (const variant of variants) {
+    const parsed = parseJsonObject(variant);
+    if (!parsed || typeof parsed !== "object") continue;
+
+    const parsedUser = parsed.user;
+    if (parsedUser && typeof parsedUser === "object" && parsedUser.id !== undefined && parsedUser.id !== null) {
+      return parsedUser;
+    }
+
+    const parsedReceiver = parsed.receiver;
+    if (parsedReceiver && typeof parsedReceiver === "object" && parsedReceiver.id !== undefined && parsedReceiver.id !== null) {
+      return parsedReceiver;
+    }
+
+    if (parsed.id !== undefined && parsed.id !== null) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
 function parseTelegramUserFromInitData(initDataRaw) {
   const initData = String(initDataRaw ?? "").trim();
   if (!initData) return null;
@@ -6209,18 +6255,17 @@ function parseTelegramUserFromInitData(initDataRaw) {
     return null;
   }
 
-  const userRaw = String(params.get("user") || "").trim();
-  if (!userRaw) return null;
+  const directKeys = ["user", "receiver"];
+  for (const key of directKeys) {
+    const value = String(params.get(key) || "").trim();
+    const parsedIdentity = parseTelegramIdentityCandidate(value);
+    if (parsedIdentity) return parsedIdentity;
+  }
 
-  const candidates = [
-    userRaw,
-    safeDecodeURIComponent(userRaw),
-    safeDecodeURIComponent(safeDecodeURIComponent(userRaw)),
-  ];
-
-  for (const candidate of candidates) {
-    const parsed = parseJsonObject(candidate);
-    if (parsed?.id !== undefined && parsed?.id !== null) return parsed;
+  const tgDataRaw = String(params.get("tgWebAppData") || "").trim();
+  if (tgDataRaw) {
+    const fromTgData = parseTelegramUserFromInitData(safeDecodeURIComponent(tgDataRaw));
+    if (fromTgData) return fromTgData;
   }
 
   return null;
@@ -6254,15 +6299,27 @@ function parseTelegramUserFromLocation() {
 }
 
 function resolveTelegramUser(tg) {
-  const unsafeUser = tg?.initDataUnsafe?.user;
-  if (unsafeUser && typeof unsafeUser === "object") {
-    return unsafeUser;
+  const unsafeCandidates = [tg?.initDataUnsafe?.user, tg?.initDataUnsafe?.receiver];
+  for (const candidate of unsafeCandidates) {
+    if (candidate && typeof candidate === "object" && candidate.id !== undefined && candidate.id !== null) {
+      return candidate;
+    }
   }
 
   const fromInitData = parseTelegramUserFromInitData(tg?.initData);
   if (fromInitData) return fromInitData;
 
   return parseTelegramUserFromLocation();
+}
+
+async function resolveTelegramUserFromBackend() {
+  if (!UPGRADE_API_BASE) return null;
+  const payload = await fetchUpgradeApiJson("/auth/whoami", {}, 9000);
+  if (!payload || payload.ok === false) return null;
+  const backendUser = payload.user ?? payload.telegram_user ?? payload.telegramUser;
+  if (!backendUser || typeof backendUser !== "object") return null;
+  if (backendUser.id === undefined || backendUser.id === null) return null;
+  return backendUser;
 }
 
 function setupTelegramUser() {
@@ -6281,9 +6338,10 @@ function setupTelegramUser() {
     if (typeof tg.setHeaderColor === "function") tg.setHeaderColor("#0a0b0f");
     if (typeof tg.disableVerticalSwipes === "function") tg.disableVerticalSwipes();
 
-    const hydrateUser = () => {
-      const resolvedUser = resolveTelegramUser(tg);
+    const applyResolvedUser = (resolvedUser) => {
       if (!resolvedUser) return false;
+      if (typeof resolvedUser !== "object") return false;
+      if (resolvedUser.id === undefined || resolvedUser.id === null) return false;
       const prevUserId = String(state.currentUser?.id ?? "").trim();
       const mergedUser = { ...fallbackUser, ...resolvedUser };
       state.currentUser = mergedUser;
@@ -6304,20 +6362,42 @@ function setupTelegramUser() {
       return true;
     };
 
-    if (hydrateUser()) return;
+    const hydrateUserSync = () => applyResolvedUser(resolveTelegramUser(tg));
+    const hydrateUserWithBackend = async (attempt = 0) => {
+      if (hydrateUserSync()) return true;
+      const shouldProbeBackend = Boolean(UPGRADE_API_BASE) && (attempt % 3 === 0);
+      if (!shouldProbeBackend) return false;
+      const backendUser = await resolveTelegramUserFromBackend();
+      return applyResolvedUser(backendUser);
+    };
+
+    if (hydrateUserSync()) return;
 
     state.currentUser = { ...fallbackUser };
     applyUserProfile(state.currentUser);
 
     let retries = 0;
-    const retryHydration = () => {
-      if (hydrateUser()) return;
+    const retryHydration = async () => {
+      if (await hydrateUserWithBackend(retries)) return;
       retries += 1;
-      if (retries < 3) {
-        setTimeout(retryHydration, 280 * retries);
+      if (retries < TELEGRAM_USER_HYDRATE_MAX_RETRIES) {
+        const delay = Math.min(2600, TELEGRAM_USER_HYDRATE_BASE_DELAY_MS * retries);
+        setTimeout(() => {
+          void retryHydration();
+        }, delay);
       }
     };
-    setTimeout(retryHydration, 180);
+    setTimeout(() => {
+      void retryHydration();
+    }, 180);
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) return;
+      void hydrateUserWithBackend(0);
+    });
+    window.addEventListener("focus", () => {
+      void hydrateUserWithBackend(0);
+    });
   } catch (error) {
     console.error("Telegram WebApp init error:", error);
     state.currentUser = { ...fallbackUser };
