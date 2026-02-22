@@ -1,24 +1,67 @@
 const tabMeta = {
   tasks: {
     title: "Задания",
-    subtitle: "Выполняй миссии, получай XP и билеты на редкие кейсы.",
+    subtitle: "Быстрые миссии на XP, билеты и бусты к апгрейду.",
   },
   upgrades: {
     title: "Апгрейды",
-    subtitle: "Повышай редкость NFT: шанс на апгрейд или риск потери.",
+    subtitle: "Выбери свой NFT, задай цель и крути апгрейд по формуле шансов.",
   },
   cases: {
     title: "Кейсы",
-    subtitle: "Открывай кейсы с разным уровнем риска и наград.",
+    subtitle: "Открывай кейсы под риск-профиль: Bronze, Silver, Black.",
   },
   bonuses: {
     title: "Бонусы",
-    subtitle: "Серия входа и активности повышает итоговые шансы.",
+    subtitle: "Серия входа и активность дают стабильный буст к вероятности.",
   },
   profile: {
     title: "Вы",
-    subtitle: "Твой профиль синхронизирован с Telegram без регистрации.",
+    subtitle: "Профиль из Telegram + TON Wallet, без отдельной регистрации.",
   },
+};
+
+const tierWeight = {
+  Common: 0.92,
+  Uncommon: 1,
+  Rare: 1.08,
+  Epic: 1.16,
+  Legendary: 1.26,
+};
+
+const targetPool = [
+  { id: "t1", name: "Carbon Wolf #402", tier: "Epic", value: 4.6 },
+  { id: "t2", name: "Orbit Ape #911", tier: "Legendary", value: 9.4 },
+  { id: "t3", name: "Drift Raven #077", tier: "Legendary", value: 16.5 },
+  { id: "t4", name: "Mirror Fox #238", tier: "Epic", value: 7.1 },
+];
+
+const player = {
+  upgradesTotal: 39,
+  upgradesWon: 24,
+  owned: [
+    { id: "o1", name: "Neon Lynx #120", tier: "Rare", value: 2.8 },
+    { id: "o2", name: "Ghost Rhino #056", tier: "Epic", value: 7.9 },
+    { id: "o3", name: "Null Dragon #008", tier: "Legendary", value: 14.2 },
+    { id: "o4", name: "Mono Shark #319", tier: "Uncommon", value: 1.6 },
+    { id: "o5", name: "Static Crow #772", tier: "Rare", value: 3.2 },
+    { id: "o6", name: "Metal Deer #510", tier: "Epic", value: 6.4 },
+  ],
+  dropped: [
+    { id: "d1", name: "Pulse Tiger #201", tier: "Epic", value: 6.8 },
+    { id: "d2", name: "Night Owl #403", tier: "Rare", value: 3.6 },
+    { id: "d3", name: "Chrome Bull #915", tier: "Legendary", value: 12.7 },
+    { id: "d4", name: "Echo Fox #039", tier: "Rare", value: 2.9 },
+    { id: "d5", name: "Storm Hare #614", tier: "Epic", value: 7.2 },
+    { id: "d6", name: "Iron Mantis #147", tier: "Uncommon", value: 2.2 },
+  ],
+};
+
+const state = {
+  selectedOwnId: player.owned[0]?.id ?? null,
+  selectedTargetId: targetPool[0]?.id ?? null,
+  profileTab: "my",
+  tonConnectUI: null,
 };
 
 const fallbackUser = {
@@ -28,6 +71,35 @@ const fallbackUser = {
   username: "guest",
   photo_url: "",
 };
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function byId(list, id) {
+  return list.find((item) => item.id === id) ?? null;
+}
+
+function formatTon(value) {
+  return `${value.toFixed(2)} TON`;
+}
+
+function shortAddress(address) {
+  if (!address || address.length < 12) return address || "-";
+  return `${address.slice(0, 6)}...${address.slice(-6)}`;
+}
+
+function calculateChance(source, target) {
+  if (!source || !target) return 0;
+
+  const ratio = source.value / target.value;
+  const valueFactor = Math.pow(Math.max(ratio, 0.01), 0.88) * 58;
+  const tierFactor = ((tierWeight[source.tier] || 1) / (tierWeight[target.tier] || 1)) * 16;
+  const valuePenalty = Math.max(0, target.value - source.value) * 2.4;
+  const rawChance = valueFactor + tierFactor - valuePenalty + 6;
+
+  return clamp(rawChance, 3, 91);
+}
 
 function setupTabs() {
   const buttons = Array.from(document.querySelectorAll(".nav-btn"));
@@ -53,35 +125,203 @@ function setupTabs() {
   buttons.forEach((button) => {
     button.addEventListener("click", () => setTab(button.dataset.tab));
   });
+
+  const defaultTab = document.querySelector(".nav-btn.is-active")?.dataset.tab || "upgrades";
+  setTab(defaultTab);
 }
 
-function setupUpgradeSimulation() {
-  const slider = document.getElementById("chance-slider");
-  const output = document.getElementById("chance-value");
-  const button = document.getElementById("upgrade-btn");
-  const result = document.getElementById("upgrade-result");
+function createOptionNode(nft, isActive) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `nft-option${isActive ? " is-active" : ""}`;
+  button.dataset.id = nft.id;
+  button.innerHTML = `
+    <span class="nft-title">${nft.name}</span>
+    <span class="nft-meta">
+      <span>${nft.tier}</span>
+      <span>${formatTon(nft.value)}</span>
+    </span>
+  `;
+  return button;
+}
 
-  const paintValue = () => {
-    output.textContent = `${slider.value}%`;
+function ensureSelectedIds() {
+  if (!byId(player.owned, state.selectedOwnId)) {
+    state.selectedOwnId = player.owned[0]?.id ?? null;
+  }
+
+  if (!byId(targetPool, state.selectedTargetId)) {
+    state.selectedTargetId = targetPool[0]?.id ?? null;
+  }
+}
+
+function refreshUpgradeMath() {
+  ensureSelectedIds();
+
+  const source = byId(player.owned, state.selectedOwnId);
+  const target = byId(targetPool, state.selectedTargetId);
+  const chance = calculateChance(source, target);
+
+  const chanceRing = document.getElementById("chance-ring");
+  const chanceValue = document.getElementById("chance-value");
+  const sourceTotal = document.getElementById("source-total");
+  const targetTotal = document.getElementById("target-total");
+  const ratioOutput = document.getElementById("math-ratio");
+  const tierOutput = document.getElementById("math-tier");
+  const sourceOutput = document.getElementById("math-source");
+  const targetOutput = document.getElementById("math-target");
+  const noteOutput = document.getElementById("math-note");
+  const button = document.getElementById("upgrade-btn");
+
+  if (!source || !target) {
+    chanceRing.style.setProperty("--chance", "0");
+    chanceValue.textContent = "0%";
+    sourceTotal.textContent = "-";
+    targetTotal.textContent = "-";
+    ratioOutput.textContent = "-";
+    tierOutput.textContent = "-";
+    sourceOutput.textContent = "Нет NFT";
+    targetOutput.textContent = "Выбери цель";
+    noteOutput.textContent = "У тебя закончились NFT. Получи новые в кейсах или бонусах.";
+    button.disabled = true;
+    return;
+  }
+
+  const valueRatio = source.value / target.value;
+  const tierPressure = ((tierWeight[target.tier] || 1) / (tierWeight[source.tier] || 1)).toFixed(2);
+
+  chanceRing.style.setProperty("--chance", chance.toFixed(2));
+  chanceValue.textContent = `${chance.toFixed(1)}%`;
+
+  sourceTotal.textContent = formatTon(source.value);
+  targetTotal.textContent = formatTon(target.value);
+  sourceOutput.textContent = `${source.tier} / ${formatTon(source.value)}`;
+  targetOutput.textContent = `${target.tier} / ${formatTon(target.value)}`;
+  ratioOutput.textContent = `${valueRatio.toFixed(2)}x`;
+  tierOutput.textContent = `${tierPressure}x`;
+  noteOutput.textContent = "Чем выше стоимость цели и ее tier, тем сильнее просадка вероятности.";
+  button.disabled = false;
+}
+
+function renderUpgradeLists() {
+  ensureSelectedIds();
+
+  const ownList = document.getElementById("own-nft-list");
+  const targetList = document.getElementById("target-nft-list");
+  ownList.innerHTML = "";
+  targetList.innerHTML = "";
+
+  player.owned.slice(0, 4).forEach((nft) => {
+    const option = createOptionNode(nft, nft.id === state.selectedOwnId);
+    option.addEventListener("click", () => {
+      state.selectedOwnId = nft.id;
+      renderUpgradeLists();
+      refreshUpgradeMath();
+    });
+    ownList.append(option);
+  });
+
+  targetPool.forEach((nft) => {
+    const option = createOptionNode(nft, nft.id === state.selectedTargetId);
+    option.addEventListener("click", () => {
+      state.selectedTargetId = nft.id;
+      renderUpgradeLists();
+      refreshUpgradeMath();
+    });
+    targetList.append(option);
+  });
+}
+
+function renderProfileGrid(targetElementId, list) {
+  const grid = document.getElementById(targetElementId);
+  grid.innerHTML = "";
+
+  list.slice(0, 6).forEach((nft) => {
+    const tile = document.createElement("article");
+    tile.className = "nft-tile";
+    tile.innerHTML = `
+      <strong>${nft.name}</strong>
+      <span>${nft.tier}</span>
+      <em>${formatTon(nft.value)}</em>
+    `;
+    grid.append(tile);
+  });
+}
+
+function refreshProfileStats() {
+  const nftCount = player.owned.length;
+  const winrate = player.upgradesTotal > 0
+    ? (player.upgradesWon / player.upgradesTotal) * 100
+    : 0;
+
+  document.getElementById("stat-nft-count").textContent = String(nftCount);
+  document.getElementById("stat-winrate").textContent = `${winrate.toFixed(1)}%`;
+}
+
+function setupProfileTabs() {
+  const tabButtons = Array.from(document.querySelectorAll(".profile-tab-btn"));
+  const grids = Array.from(document.querySelectorAll(".profile-nft-grid"));
+
+  const setProfileTab = (tab) => {
+    state.profileTab = tab;
+
+    tabButtons.forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.profileTab === tab);
+    });
+
+    grids.forEach((grid) => {
+      grid.classList.toggle("is-active", grid.dataset.profileGrid === tab);
+    });
   };
 
-  slider.addEventListener("input", paintValue);
-  paintValue();
+  tabButtons.forEach((button) => {
+    button.addEventListener("click", () => setProfileTab(button.dataset.profileTab));
+  });
 
-  button.addEventListener("click", () => {
-    const chance = Number(slider.value);
+  setProfileTab(state.profileTab);
+}
+
+function setupUpgradeFlow() {
+  const actionButton = document.getElementById("upgrade-btn");
+  const result = document.getElementById("upgrade-result");
+
+  actionButton.addEventListener("click", () => {
+    const source = byId(player.owned, state.selectedOwnId);
+    const target = byId(targetPool, state.selectedTargetId);
+    const chance = calculateChance(source, target);
+
+    if (!source || !target) return;
+
     const roll = Math.random() * 100;
     const success = roll <= chance;
 
-    result.classList.remove("success", "fail");
+    player.owned = player.owned.filter((nft) => nft.id !== source.id);
+    player.upgradesTotal += 1;
+
     if (success) {
-      result.textContent = "Успех: NFT улучшен на 1 уровень.";
+      player.upgradesWon += 1;
+
+      const minted = {
+        ...target,
+        id: `m${Date.now()}`,
+      };
+
+      player.owned.unshift(minted);
+      player.dropped.unshift(minted);
+      result.textContent = `Успех: ${source.name} -> ${target.name}.`;
+      result.classList.remove("fail");
       result.classList.add("success");
-      return;
+    } else {
+      result.textContent = `Неудача: ${source.name} сгорел в апгрейде.`;
+      result.classList.remove("success");
+      result.classList.add("fail");
     }
 
-    result.textContent = "Неудача: апгрейд не прошел, NFT потерян.";
-    result.classList.add("fail");
+    renderUpgradeLists();
+    refreshUpgradeMath();
+    renderProfileGrid("my-nft-grid", player.owned);
+    renderProfileGrid("dropped-nft-grid", player.dropped);
+    refreshProfileStats();
   });
 }
 
@@ -111,7 +351,7 @@ function applyUserProfile(user) {
 
   document.getElementById("profile-name").textContent = fullName;
   document.getElementById("profile-handle").textContent = handle;
-  document.getElementById("profile-id").textContent = user.id ?? "-";
+  document.getElementById("profile-id").textContent = `ID: ${user.id ?? "-"}`;
 
   setAvatar(document.getElementById("nav-avatar"), user);
   setAvatar(document.getElementById("profile-avatar"), user);
@@ -127,6 +367,8 @@ function setupTelegramUser() {
   try {
     tg.ready();
     tg.expand();
+    tg.setBackgroundColor("#0b0b0d");
+    tg.setHeaderColor("#0b0b0d");
 
     const user = tg.initDataUnsafe?.user;
     applyUserProfile(user ? { ...fallbackUser, ...user } : fallbackUser);
@@ -136,6 +378,71 @@ function setupTelegramUser() {
   }
 }
 
-setupTabs();
-setupUpgradeSimulation();
-setupTelegramUser();
+function setupTonConnect() {
+  const connectButton = document.getElementById("connect-wallet-btn");
+  const walletShort = document.getElementById("wallet-short");
+
+  if (!window.TON_CONNECT_UI?.TonConnectUI) {
+    walletShort.textContent = "TonConnect UI не загружен";
+    connectButton.disabled = true;
+    return;
+  }
+
+  const manifestUrl = new URL("./tonconnect-manifest.json", window.location.href).toString();
+
+  try {
+    state.tonConnectUI = new window.TON_CONNECT_UI.TonConnectUI({
+      manifestUrl,
+    });
+  } catch (error) {
+    console.error("TonConnect init error:", error);
+    walletShort.textContent = "Ошибка инициализации TON Connect";
+    connectButton.disabled = true;
+    return;
+  }
+
+  const paintConnectionState = (wallet) => {
+    const address = wallet?.account?.address || state.tonConnectUI?.account?.address || "";
+    const connected = Boolean(address);
+
+    connectButton.textContent = connected ? "Отключить TON Wallet" : "Connect TON Wallet";
+    walletShort.textContent = connected
+      ? `Подключен: ${shortAddress(address)}`
+      : "Кошелек не подключен";
+  };
+
+  paintConnectionState(state.tonConnectUI.wallet);
+
+  state.tonConnectUI.onStatusChange(
+    (wallet) => paintConnectionState(wallet),
+    (error) => console.error("TonConnect status error:", error),
+  );
+
+  connectButton.addEventListener("click", async () => {
+    try {
+      if (state.tonConnectUI.connected) {
+        await state.tonConnectUI.disconnect();
+      } else {
+        await state.tonConnectUI.openModal();
+      }
+    } catch (error) {
+      console.error("TonConnect action error:", error);
+      walletShort.textContent = "Не удалось подключить кошелек";
+    }
+  });
+}
+
+function bootstrap() {
+  setupTabs();
+  setupTelegramUser();
+  setupProfileTabs();
+  setupUpgradeFlow();
+  renderUpgradeLists();
+  refreshUpgradeMath();
+  renderProfileGrid("my-nft-grid", player.owned);
+  renderProfileGrid("dropped-nft-grid", player.dropped);
+  refreshProfileStats();
+  setupTonConnect();
+}
+
+bootstrap();

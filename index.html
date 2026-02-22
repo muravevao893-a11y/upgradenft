@@ -3,132 +3,198 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#060912">
-  <title>UPGRADE NFT Mini App</title>
+  <meta name="theme-color" content="#0b0b0d">
+  <title>UPNFT Mini App</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
+
   <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script defer src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
   <script defer src="./app.js"></script>
 </head>
 <body>
-  <div class="bg-layer" aria-hidden="true"></div>
-
   <main class="app-shell">
-    <header class="app-header reveal delay-1">
+    <header class="app-header">
       <p class="eyebrow">UPGRADE NFT</p>
       <h1 id="screen-title">Апгрейды</h1>
-      <p id="screen-subtitle" class="subtitle">Повышай редкость NFT: шанс на апгрейд или риск потери.</p>
+      <p id="screen-subtitle" class="subtitle">Выбери свой NFT, задай цель и крути апгрейд по формуле шансов.</p>
     </header>
 
-    <section class="tab-section is-active reveal delay-2" data-tab-section="upgrades">
-      <article class="card upgrade-card">
-        <h2>Стол апгрейда</h2>
-        <p class="muted">Выбери NFT, настрой шанс и запускай попытку улучшения.</p>
-
-        <div class="nft-preview">
-          <div class="nft-ring"></div>
-          <div>
-            <p class="nft-name">Cyber Fox #197</p>
-            <p class="nft-level">Текущий уровень: Rare</p>
+    <div class="sections-wrap">
+      <section class="tab-section" data-tab-section="tasks">
+        <article class="panel compact-panel">
+          <h2>Задания</h2>
+          <div class="task-grid">
+            <div class="task-card">
+              <p>Подключить TON Wallet</p>
+              <strong>+15 XP</strong>
+            </div>
+            <div class="task-card">
+              <p>Сделать 1 апгрейд</p>
+              <strong>+20 XP</strong>
+            </div>
+            <div class="task-card">
+              <p>Открыть кейс</p>
+              <strong>+1 билет</strong>
+            </div>
+            <div class="task-card">
+              <p>Апгрейд 3 дня подряд</p>
+              <strong>+7% буст</strong>
+            </div>
           </div>
-        </div>
+        </article>
+      </section>
 
-        <div class="chance-row">
-          <label for="chance-slider">Шанс успеха</label>
-          <output id="chance-value" for="chance-slider">42%</output>
-        </div>
-        <input id="chance-slider" class="chance-slider" type="range" min="10" max="90" step="1" value="42">
+      <section class="tab-section is-active" data-tab-section="upgrades">
+        <article class="panel upgrades-panel">
+          <div class="upgrade-grid">
+            <div class="upgrade-column">
+              <div class="column-head">
+                <h2>Ваши NFT</h2>
+                <span id="source-total" class="tiny">-</span>
+              </div>
+              <div id="own-nft-list" class="nft-list"></div>
+            </div>
 
-        <p class="risk-text">Если апгрейд не пройдет, NFT может сгореть.</p>
-        <button id="upgrade-btn" class="primary-btn" type="button">Запустить апгрейд</button>
-        <p id="upgrade-result" class="upgrade-result" aria-live="polite"></p>
-      </article>
-    </section>
-
-    <section class="tab-section" data-tab-section="tasks">
-      <article class="card">
-        <h2>Задания</h2>
-        <ul class="list">
-          <li>
-            <span>Подключить кошелек</span>
-            <strong>+15 XP</strong>
-          </li>
-          <li>
-            <span>Сделать 1 апгрейд</span>
-            <strong>+20 XP</strong>
-          </li>
-          <li>
-            <span>Поделиться ботом</span>
-            <strong>+1 билет</strong>
-          </li>
-        </ul>
-      </article>
-    </section>
-
-    <section class="tab-section" data-tab-section="cases">
-      <article class="card">
-        <h2>Кейсы</h2>
-        <div class="case-grid">
-          <div class="case-tile">
-            <p>Starter</p>
-            <small>Низкий риск</small>
+            <div class="upgrade-column">
+              <div class="column-head">
+                <h2>Хочу получить</h2>
+                <span id="target-total" class="tiny">-</span>
+              </div>
+              <div id="target-nft-list" class="nft-list"></div>
+            </div>
           </div>
-          <div class="case-tile">
-            <p>Pro</p>
-            <small>Средний риск</small>
-          </div>
-          <div class="case-tile">
-            <p>Legend</p>
-            <small>Высокий риск</small>
-          </div>
-        </div>
-      </article>
-    </section>
 
-    <section class="tab-section" data-tab-section="bonuses">
-      <article class="card">
-        <h2>Бонусы</h2>
-        <p class="muted">Ежедневный вход и серия дают буст к шансам.</p>
-        <div class="bonus-meter">
-          <span>Серия входа</span>
-          <strong>5 дней</strong>
-        </div>
-        <div class="bonus-meter">
-          <span>Бонус к апгрейду</span>
-          <strong>+8%</strong>
-        </div>
-      </article>
-    </section>
+          <div class="chance-layout">
+            <div class="chance-wrap">
+              <p class="tiny chance-label">Шанс апгрейда</p>
+              <div id="chance-ring" class="chance-ring" style="--chance:50">
+                <div class="chance-orbit">
+                  <span class="orbit-arrow">➤</span>
+                </div>
+                <div class="chance-core">
+                  <strong id="chance-value">50%</strong>
+                  <small>вероятность</small>
+                </div>
+              </div>
+            </div>
 
-    <section class="tab-section" data-tab-section="profile">
-      <article class="card profile-card">
-        <div class="profile-main">
-          <div id="profile-avatar" class="profile-avatar">U</div>
-          <div>
-            <h2 id="profile-name">Гость</h2>
-            <p id="profile-handle" class="muted">@guest</p>
+            <div class="math-box">
+              <div class="math-row">
+                <span>Ваш NFT</span>
+                <strong id="math-source">-</strong>
+              </div>
+              <div class="math-row">
+                <span>Цель</span>
+                <strong id="math-target">-</strong>
+              </div>
+              <div class="math-row">
+                <span>Value ratio</span>
+                <strong id="math-ratio">-</strong>
+              </div>
+              <div class="math-row">
+                <span>Tier pressure</span>
+                <strong id="math-tier">-</strong>
+              </div>
+              <p id="math-note" class="math-note">Чем выше стоимость цели относительно твоего NFT, тем ниже шанс.</p>
+            </div>
           </div>
-        </div>
 
-        <div class="profile-grid">
-          <div>
-            <span>ID</span>
-            <strong id="profile-id">-</strong>
-          </div>
-          <div>
-            <span>Статус</span>
-            <strong>Игрок</strong>
-          </div>
-        </div>
+          <button id="upgrade-btn" class="primary-btn" type="button">Запустить апгрейд</button>
+          <p id="upgrade-result" class="upgrade-result" aria-live="polite"></p>
+        </article>
+      </section>
 
-        <p class="muted">Профиль берется из Telegram. Отдельная регистрация не нужна.</p>
-      </article>
-    </section>
+      <section class="tab-section" data-tab-section="cases">
+        <article class="panel compact-panel">
+          <h2>Кейсы</h2>
+          <div class="case-grid">
+            <button class="case-card">
+              <span>Bronze</span>
+              <small>Низкий риск</small>
+            </button>
+            <button class="case-card">
+              <span>Silver</span>
+              <small>Средний риск</small>
+            </button>
+            <button class="case-card">
+              <span>Black</span>
+              <small>Высокий риск</small>
+            </button>
+          </div>
+        </article>
+      </section>
+
+      <section class="tab-section" data-tab-section="bonuses">
+        <article class="panel compact-panel">
+          <h2>Бонусы</h2>
+          <div class="bonus-list">
+            <div class="bonus-row">
+              <span>Серия входа</span>
+              <strong>6 дней</strong>
+            </div>
+            <div class="bonus-row">
+              <span>Буст к шансу</span>
+              <strong>+9%</strong>
+            </div>
+            <div class="bonus-row">
+              <span>VIP-множитель</span>
+              <strong>x1.2</strong>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="tab-section" data-tab-section="profile">
+        <article class="panel profile-panel">
+          <div class="profile-top">
+            <div id="profile-avatar" class="profile-avatar">U</div>
+            <div class="profile-meta">
+              <h2 id="profile-name">Гость</h2>
+              <p id="profile-handle">@guest</p>
+              <small id="profile-id">ID: -</small>
+            </div>
+            <div class="profile-rank">RANK 12</div>
+          </div>
+
+          <div class="profile-stats">
+            <div>
+              <span>NFT</span>
+              <strong id="stat-nft-count">0</strong>
+            </div>
+            <div>
+              <span>Апгрейдов</span>
+              <strong>39</strong>
+            </div>
+            <div>
+              <span>Winrate</span>
+              <strong id="stat-winrate">0%</strong>
+            </div>
+          </div>
+
+          <div class="wallet-box">
+            <button id="connect-wallet-btn" class="wallet-btn" type="button">Connect TON Wallet</button>
+            <p id="wallet-short" class="wallet-short">Кошелек не подключен</p>
+          </div>
+
+          <div class="profile-tabs">
+            <button class="profile-tab-btn is-active" data-profile-tab="my" type="button">Мои NFT</button>
+            <button class="profile-tab-btn" data-profile-tab="dropped" type="button">Выбитые NFT</button>
+          </div>
+
+          <div class="profile-nft-panels">
+            <div class="profile-nft-grid is-active" data-profile-grid="my" id="my-nft-grid"></div>
+            <div class="profile-nft-grid" data-profile-grid="dropped" id="dropped-nft-grid"></div>
+          </div>
+        </article>
+      </section>
+    </div>
   </main>
 
-  <nav class="bottom-nav reveal delay-3" aria-label="Навигация">
+  <nav class="bottom-nav" aria-label="Навигация">
     <button class="nav-btn" data-tab="tasks" type="button" aria-label="Задания">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M7 5h10M7 12h10M7 19h6" />
