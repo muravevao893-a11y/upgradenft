@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-13";
+const APP_VERSION = "2026-02-22-14";
 
 const tabMeta = {
   tasks: {
@@ -7,7 +7,7 @@ const tabMeta = {
   },
   upgrades: {
     title: "Апгрейды",
-    subtitle: "Выбирай цель и запускай апгрейд.",
+    subtitle: "",
   },
   cases: {
     title: "Кейсы",
@@ -262,9 +262,10 @@ function setupTabs() {
       section.classList.toggle("is-active", section.dataset.tabSection === nextTab);
     });
 
+    const subtitleText = tabMeta[nextTab].subtitle || "";
     title.textContent = tabMeta[nextTab].title;
-    subtitle.textContent = tabMeta[nextTab].subtitle;
-    subtitle.classList.toggle("hidden", nextTab === "profile");
+    subtitle.textContent = subtitleText;
+    subtitle.classList.toggle("hidden", nextTab === "profile" || !subtitleText);
   };
 
   buttons.forEach((button) => {
@@ -303,13 +304,10 @@ function createOwnNftCard(nft, isActive) {
   const title = document.createElement("strong");
   title.textContent = nft.name;
 
-  const tier = document.createElement("small");
-  tier.textContent = nft.tier;
-
   const value = document.createElement("span");
   value.textContent = formatTon(nft.value);
 
-  body.append(title, tier, value);
+  body.append(title, value);
   card.append(createNftThumb(nft.imageUrl), body);
   return card;
 }
@@ -479,15 +477,14 @@ function refreshUpgradeState() {
   if (!source || !target) {
     chanceRing.style.setProperty("--chance", "0");
     chanceValue.textContent = "0%";
-    note.textContent = "Нужны реальные NFT и цели апгрейда.";
+    note.textContent = "Выбери NFT";
     button.disabled = true;
     return;
   }
 
-  const ratio = source.value / target.value;
   chanceRing.style.setProperty("--chance", chance.toFixed(2));
   chanceValue.textContent = `${chance.toFixed(1)}%`;
-  note.textContent = `${source.name} -> ${target.name}. Ratio ${ratio.toFixed(2)}x`;
+  note.textContent = `${source.name} → ${target.name}`;
   button.disabled = state.isSpinning;
 }
 
@@ -538,14 +535,12 @@ function applyUpgradeResult(success, source, target, landedAngle, chance, result
     state.data.dropped.unshift(minted);
   }
 
-  const zone = (chance * 3.6).toFixed(1);
-  const stop = landedAngle.toFixed(1);
   if (success) {
-    resultNode.textContent = `Успех. Стрелка: ${stop}°, win-зона: ${zone}°.`;
+    resultNode.textContent = "Успех";
     resultNode.classList.remove("fail");
     resultNode.classList.add("success");
   } else {
-    resultNode.textContent = `Неудача. Стрелка: ${stop}°, win-зона: ${zone}°.`;
+    resultNode.textContent = "Неудача";
     resultNode.classList.remove("success");
     resultNode.classList.add("fail");
   }
@@ -568,7 +563,7 @@ function setupUpgradeFlow() {
     actionButton.disabled = true;
     actionButton.textContent = "Крутим...";
     result.classList.remove("success", "fail");
-    result.textContent = "Стрелка вращается...";
+    result.textContent = "";
 
     try {
       const spinResult = await spinArrowToResult(chance);

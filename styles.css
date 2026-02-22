@@ -164,30 +164,32 @@ p {
 }
 
 .upgrade-screen {
-  align-items: center;
-  text-align: center;
+  align-items: stretch;
+  text-align: left;
   overflow: hidden;
-  gap: 6px;
+  gap: 10px;
 }
 
 .target-block {
   width: 100%;
+  display: grid;
+  gap: 6px;
 }
 
 .label {
-  text-align: left;
-  font-size: 12px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 11px;
+  color: #b6bdd0;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
 }
 
 .target-chip-list {
-  margin-top: 6px;
   display: flex;
-  gap: 7px;
+  gap: 8px;
   overflow-x: auto;
   padding-bottom: 2px;
+  padding-right: 2px;
 }
 
 .target-chip-list::-webkit-scrollbar {
@@ -201,25 +203,31 @@ p {
 
 .target-chip {
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 8px 10px;
   background: #0f1118;
   color: #d6dbe8;
   text-align: left;
   display: grid;
-  gap: 2px;
+  gap: 3px;
   font-family: inherit;
   cursor: pointer;
-  white-space: nowrap;
+  min-width: 132px;
+  max-width: 176px;
 }
 
 .target-chip b {
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .target-chip span {
   color: var(--muted);
   font-size: 11px;
+  font-weight: 700;
 }
 
 .target-chip.is-active {
@@ -229,7 +237,10 @@ p {
 }
 
 .wheel-zone {
-  margin-top: 0;
+  width: 100%;
+  margin-top: 2px;
+  display: grid;
+  place-items: center;
 }
 
 .chance-ring {
@@ -341,16 +352,24 @@ p {
 }
 
 .math-note {
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 4px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.24;
-  min-height: 28px;
+  font-size: 11px;
+  line-height: 1.2;
+  min-height: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .primary-btn {
   width: 100%;
-  height: 42px;
+  height: 44px;
   border: 1px solid #555c70;
   border-radius: 12px;
   background: linear-gradient(180deg, #2f3543, #232834);
@@ -368,10 +387,12 @@ p {
 
 .upgrade-result {
   width: 100%;
-  min-height: 14px;
+  min-height: 16px;
   color: var(--muted);
-  text-align: left;
-  font-size: 11px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .upgrade-result.success {
@@ -386,8 +407,9 @@ p {
   width: 100%;
   text-align: left;
   margin-top: 0;
-  font-size: 20px;
-  line-height: 1;
+  font-size: 16px;
+  line-height: 1.1;
+  font-weight: 700;
 }
 
 .nft-card-list {
@@ -395,7 +417,7 @@ p {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  max-height: 232px;
+  max-height: 220px;
   overflow: auto;
   padding-right: 2px;
 }
@@ -426,7 +448,7 @@ p {
 }
 
 .nft-thumb {
-  height: 86px;
+  height: 82px;
   background:
     radial-gradient(120px 90px at 30% 10%, #2b2f40 0%, transparent 70%),
     linear-gradient(160deg, #1a1f2b, #10131a 65%, #14151d);
@@ -439,13 +461,16 @@ p {
 }
 
 .nft-body {
-  padding: 7px 8px 8px;
+  padding: 7px 8px;
 }
 
 .nft-body strong {
   display: block;
   font-size: 12px;
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .nft-body small {
@@ -457,9 +482,13 @@ p {
 
 .nft-body span {
   display: block;
-  margin-top: 4px;
+  margin-top: 3px;
   font-size: 12px;
   font-weight: 700;
+}
+
+.upgrade-screen .empty-note {
+  text-align: center;
 }
 
 .case-list {
