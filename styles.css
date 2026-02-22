@@ -266,17 +266,7 @@ p {
 }
 
 .chance-ring::before {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 50%;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  transform: translateX(-50%);
-  background: #f2f6ff;
-  box-shadow: 0 0 0 3px #0f1117;
-  z-index: 3;
+  content: none;
 }
 
 .chance-ring::after {
@@ -340,30 +330,60 @@ p {
 
 .chance-orbit {
   position: absolute;
-  inset: -3px;
+  inset: 9px;
   border-radius: 50%;
   transform: rotate(0deg);
   transform-origin: center;
   will-change: transform;
+  pointer-events: none;
+  z-index: 4;
 }
 
 .orbit-arrow {
-  position: absolute;
-  top: 1px;
-  left: 50%;
-  width: 14px;
-  height: 34px;
-  transform: translate(-50%, -55%);
-  overflow: visible;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+  display: none;
 }
 
-.orbit-arrow path {
-  fill: none;
-  stroke: #f2f6ff;
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.chance-orbit::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: #f2f6ff;
+  box-shadow:
+    0 0 0 2px #0f1117,
+    0 0 12px rgba(242, 246, 255, 0.48);
+}
+
+.chance-orbit::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from -90deg,
+    rgba(242, 246, 255, 0.55) 0deg,
+    rgba(242, 246, 255, 0.22) 16deg,
+    rgba(242, 246, 255, 0) 44deg
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 11px),
+    #000 calc(100% - 10px),
+    #000 calc(100% - 5px),
+    transparent calc(100% - 4px)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 11px),
+    #000 calc(100% - 10px),
+    #000 calc(100% - 5px),
+    transparent calc(100% - 4px)
+  );
+  opacity: 0.92;
 }
 
 .math-note {
