@@ -250,7 +250,7 @@ p {
   height: 124px;
   border-radius: 50%;
   position: relative;
-  background: conic-gradient(var(--accent) calc(var(--chance) * 1%), #2a2c33 0);
+  background: conic-gradient(from -90deg, var(--accent) calc(var(--chance) * 1%), #2a2c33 0);
   display: grid;
   place-items: center;
 }
@@ -289,7 +289,9 @@ p {
   position: absolute;
   inset: -8px;
   border-radius: 50%;
-  animation: orbit 3.2s linear infinite;
+  transform: rotate(0deg);
+  transform-origin: center;
+  will-change: transform;
 }
 
 .orbit-arrow {
@@ -654,12 +656,6 @@ p {
 
 .nav-btn.profile-nav {
   gap: 2px;
-}
-
-@keyframes orbit {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @media (min-width: 520px) {

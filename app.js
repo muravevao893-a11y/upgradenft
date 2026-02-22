@@ -62,6 +62,9 @@ const state = {
   selectedTargetId: targetPool[0]?.id ?? null,
   profileTab: "my",
   tonConnectUI: null,
+  orbitAngle: 0,
+  isSpinning: false,
+  spinRafId: null,
 };
 
 const fallbackUser = {
@@ -74,6 +77,22 @@ const fallbackUser = {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function normalizeAngle(angle) {
+  const normalized = angle % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function setOrbitAngle(angle) {
+  state.orbitAngle = angle;
+  const orbit = document.querySelector(".chance-orbit");
+  if (!orbit) return;
+  orbit.style.transform = `rotate(${angle}deg)`;
 }
 
 function byId(list, id) {
@@ -200,7 +219,7 @@ function refreshUpgradeMath() {
   ratioOutput.textContent = `${valueRatio.toFixed(2)}x`;
   tierOutput.textContent = `${tierPressure}x`;
   noteOutput.textContent = "Чем выше стоимость цели и ее tier, тем сильнее просадка вероятности.";
-  button.disabled = false;
+  button.disabled = state.isSpinning;
 }
 
 function renderUpgradeLists() {
@@ -214,6 +233,7 @@ function renderUpgradeLists() {
   player.owned.slice(0, 4).forEach((nft) => {
     const option = createOptionNode(nft, nft.id === state.selectedOwnId);
     option.addEventListener("click", () => {
+      if (state.isSpinning) return;
       state.selectedOwnId = nft.id;
       renderUpgradeLists();
       refreshUpgradeMath();
@@ -224,6 +244,7 @@ function renderUpgradeLists() {
   targetPool.forEach((nft) => {
     const option = createOptionNode(nft, nft.id === state.selectedTargetId);
     option.addEventListener("click", () => {
+      if (state.isSpinning) return;
       state.selectedTargetId = nft.id;
       renderUpgradeLists();
       refreshUpgradeMath();
@@ -281,47 +302,97 @@ function setupProfileTabs() {
   setProfileTab(state.profileTab);
 }
 
+function spinArrowToResult(chancePercent) {
+  const chanceDegrees = chancePercent * 3.6;
+  const targetAngle = Math.random() * 360;
+  const currentNormalized = normalizeAngle(state.orbitAngle);
+  const deltaToTarget = (targetAngle - currentNormalized + 360) % 360;
+  const extraSpins = 5 + Math.floor(Math.random() * 3);
+  const totalDelta = (extraSpins * 360) + deltaToTarget;
+  const startAngle = state.orbitAngle;
+  const duration = 2600 + Math.random() * 600;
+  const startTime = performance.now();
+
+  return new Promise((resolve) => {
+    const step = (now) => {
+      const progress = clamp((now - startTime) / duration, 0, 1);
+      const eased = easeOutCubic(progress);
+      const angle = startAngle + (totalDelta * eased);
+      setOrbitAngle(angle);
+
+      if (progress < 1) {
+        state.spinRafId = requestAnimationFrame(step);
+        return;
+      }
+
+      state.spinRafId = null;
+      const landed = normalizeAngle(startAngle + totalDelta);
+      const success = landed <= chanceDegrees;
+      resolve({ success, landed });
+    };
+
+    state.spinRafId = requestAnimationFrame(step);
+  });
+}
+
+function applyUpgradeResult(success, source, target, landedAngle, chance, resultNode) {
+  player.owned = player.owned.filter((nft) => nft.id !== source.id);
+  player.upgradesTotal += 1;
+
+  const sectorText = `Сектор остановки: ${landedAngle.toFixed(1)}° из ${(chance * 3.6).toFixed(1)}° win-зоны.`;
+
+  if (success) {
+    player.upgradesWon += 1;
+
+    const minted = {
+      ...target,
+      id: `m${Date.now()}`,
+    };
+
+    player.owned.unshift(minted);
+    player.dropped.unshift(minted);
+    resultNode.textContent = `Успех: ${source.name} -> ${target.name}. ${sectorText}`;
+    resultNode.classList.remove("fail");
+    resultNode.classList.add("success");
+  } else {
+    resultNode.textContent = `Неудача: ${source.name} сгорел в апгрейде. ${sectorText}`;
+    resultNode.classList.remove("success");
+    resultNode.classList.add("fail");
+  }
+
+  renderProfileGrid("my-nft-grid", player.owned);
+  renderProfileGrid("dropped-nft-grid", player.dropped);
+  refreshProfileStats();
+}
+
 function setupUpgradeFlow() {
   const actionButton = document.getElementById("upgrade-btn");
   const result = document.getElementById("upgrade-result");
 
-  actionButton.addEventListener("click", () => {
+  actionButton.addEventListener("click", async () => {
+    if (state.isSpinning) return;
+
     const source = byId(player.owned, state.selectedOwnId);
     const target = byId(targetPool, state.selectedTargetId);
-    const chance = calculateChance(source, target);
-
     if (!source || !target) return;
 
-    const roll = Math.random() * 100;
-    const success = roll <= chance;
+    const chance = calculateChance(source, target);
 
-    player.owned = player.owned.filter((nft) => nft.id !== source.id);
-    player.upgradesTotal += 1;
+    state.isSpinning = true;
+    actionButton.disabled = true;
+    actionButton.textContent = "Крутим...";
+    result.classList.remove("success", "fail");
+    result.textContent = "Стрелка вращается...";
 
-    if (success) {
-      player.upgradesWon += 1;
-
-      const minted = {
-        ...target,
-        id: `m${Date.now()}`,
-      };
-
-      player.owned.unshift(minted);
-      player.dropped.unshift(minted);
-      result.textContent = `Успех: ${source.name} -> ${target.name}.`;
-      result.classList.remove("fail");
-      result.classList.add("success");
-    } else {
-      result.textContent = `Неудача: ${source.name} сгорел в апгрейде.`;
-      result.classList.remove("success");
-      result.classList.add("fail");
+    try {
+      const spinResult = await spinArrowToResult(chance);
+      applyUpgradeResult(spinResult.success, source, target, spinResult.landed, chance, result);
+    } finally {
+      state.isSpinning = false;
+      actionButton.textContent = "Запустить апгрейд";
+      renderUpgradeLists();
+      refreshUpgradeMath();
     }
-
-    renderUpgradeLists();
-    refreshUpgradeMath();
-    renderProfileGrid("my-nft-grid", player.owned);
-    renderProfileGrid("dropped-nft-grid", player.dropped);
-    refreshProfileStats();
   });
 }
 
@@ -436,6 +507,7 @@ function bootstrap() {
   setupTabs();
   setupTelegramUser();
   setupProfileTabs();
+  setOrbitAngle(state.orbitAngle);
   setupUpgradeFlow();
   renderUpgradeLists();
   refreshUpgradeMath();
