@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-43";
+const APP_VERSION = "2026-02-22-50";
 
 const tabMeta = {
   tasks: {
@@ -18,6 +18,14 @@ const tabMeta = {
     subtitle: "",
   },
   profile: {
+    title: "",
+    subtitle: "",
+  },
+  settings: {
+    title: "",
+    subtitle: "",
+  },
+  language: {
     title: "",
     subtitle: "",
   },
@@ -187,6 +195,15 @@ const TRANSLATIONS = {
     locale_search_placeholder: "Поиск языка или страны",
     locale_select_aria: "Выбрать язык",
     locale_empty: "Ничего не найдено",
+    locale_open_aria: "Открыть страницу языка ({language})",
+    language_page_title: "Язык",
+    language_page_back_aria: "Назад в профиль",
+    settings_open_aria: "Открыть настройки",
+    settings_page_title: "Настройки",
+    settings_back_aria: "Назад в профиль",
+    settings_language_title: "Язык",
+    settings_language_value: "Выбрать язык интерфейса",
+    settings_language_aria: "Открыть языковые настройки",
     lang_ru_name: "Русский",
     lang_ru_country: "Россия",
     lang_en_name: "English",
@@ -286,6 +303,15 @@ const TRANSLATIONS = {
     locale_search_placeholder: "Search language or country",
     locale_select_aria: "Select language",
     locale_empty: "Nothing found",
+    locale_open_aria: "Open language page ({language})",
+    language_page_title: "Language",
+    language_page_back_aria: "Back to profile",
+    settings_open_aria: "Open settings",
+    settings_page_title: "Settings",
+    settings_back_aria: "Back to profile",
+    settings_language_title: "Language",
+    settings_language_value: "Choose app language",
+    settings_language_aria: "Open language settings",
     lang_ru_name: "Russian",
     lang_ru_country: "Russia",
     lang_en_name: "English",
@@ -385,6 +411,15 @@ const TRANSLATIONS = {
     locale_search_placeholder: "Пошук мови або країни",
     locale_select_aria: "Обрати мову",
     locale_empty: "Нічого не знайдено",
+    locale_open_aria: "Відкрити сторінку мови ({language})",
+    language_page_title: "Мова",
+    language_page_back_aria: "Назад у профіль",
+    settings_open_aria: "Відкрити налаштування",
+    settings_page_title: "Налаштування",
+    settings_back_aria: "Назад у профіль",
+    settings_language_title: "Мова",
+    settings_language_value: "Обрати мову інтерфейсу",
+    settings_language_aria: "Відкрити мовні налаштування",
     lang_ru_name: "Російська",
     lang_ru_country: "Росія",
     lang_en_name: "Англійська",
@@ -395,9 +430,9 @@ const TRANSLATIONS = {
 };
 
 const LOCAL_KEYS = {
-  history: "upnft_history_v1",
-  analytics: "upnft_analytics_v1",
-  fair: "upnft_fair_v1",
+  history: "upnft_history_v2",
+  analytics: "upnft_analytics_v2",
+  fair: "upnft_fair_v2",
   locale: "upnft_locale_v1",
 };
 
@@ -422,7 +457,10 @@ const state = {
   profileTabsBound: false,
   profileCopyBound: false,
   localeBound: false,
+  settingsBound: false,
   upgradesUiBound: false,
+  activeTab: "upgrades",
+  setTab: null,
   tonConnectUI: null,
   tonAddress: "",
   refreshWalletData: null,
@@ -433,9 +471,10 @@ const state = {
   spinRafId: null,
   chanceRafId: null,
   displayedChance: 0,
+  upgradeOutcome: null,
   locale: DEFAULT_LOCALE,
   localeSearch: "",
-  localeMenuOpen: false,
+  languageReturnTab: "settings",
   device: "mobile",
   deviceWatchBound: false,
   currentUser: { ...fallbackUser },
@@ -732,6 +771,20 @@ function getLocaleOption(code) {
   return LOCALE_OPTIONS.find((item) => item.code === normalized) ?? LOCALE_OPTIONS[0];
 }
 
+function getLocaleDisplayName(code) {
+  const option = getLocaleOption(code);
+  const key = `lang_${option.code}_name`;
+  const translated = t(key);
+  return translated === key ? option.short : translated;
+}
+
+function getLocaleCountryName(code) {
+  const option = getLocaleOption(code);
+  const key = `lang_${option.code}_country`;
+  const translated = t(key);
+  return translated === key ? option.code.toUpperCase() : translated;
+}
+
 function detectPreferredLocale() {
   try {
     const saved = localStorage.getItem(LOCAL_KEYS.locale);
@@ -746,47 +799,53 @@ function detectPreferredLocale() {
   return normalizeLocaleCode(navigator.language || DEFAULT_LOCALE);
 }
 
-function setLocaleMenuOpen(open) {
-  state.localeMenuOpen = Boolean(open);
-  const menu = document.getElementById("locale-menu");
-  const toggle = document.getElementById("locale-toggle");
-
-  if (!state.localeMenuOpen) {
-    state.localeSearch = "";
-    const search = document.getElementById("locale-search");
-    if (search) search.value = "";
-  }
-
-  if (menu) menu.classList.toggle("hidden", !state.localeMenuOpen);
-  if (toggle) toggle.setAttribute("aria-expanded", state.localeMenuOpen ? "true" : "false");
-
-  if (!state.localeMenuOpen) {
-    renderLocalePicker();
-  }
-}
-
-function renderLocalePicker() {
-  const title = document.getElementById("locale-title");
-  const toggle = document.getElementById("locale-toggle");
-  const currentCode = document.getElementById("locale-current-code");
-  const currentFlag = document.getElementById("locale-current-flag");
-  const search = document.getElementById("locale-search");
-  const list = document.getElementById("locale-list");
-  if (!title || !toggle || !currentCode || !currentFlag || !search || !list) return;
-
-  title.textContent = t("locale_title");
-  toggle.setAttribute("aria-label", t("locale_select_aria"));
-  search.setAttribute("placeholder", t("locale_search_placeholder"));
+function renderLanguageShortcut() {
+  const trigger = document.getElementById("open-language-from-settings");
+  const label = document.getElementById("settings-language-title");
+  const value = document.getElementById("settings-language-value");
+  if (!trigger || !label || !value) return;
 
   const current = getLocaleOption(state.locale);
-  currentCode.textContent = current.short;
-  currentFlag.innerHTML = current.flagSvg;
+  const currentName = getLocaleDisplayName(current.code);
+
+  label.textContent = t("settings_language_title");
+  value.textContent = currentName;
+  trigger.setAttribute("aria-label", t("locale_open_aria", { language: currentName }));
+}
+
+function renderSettingsPage() {
+  const pageTitle = document.getElementById("settings-page-title");
+  const openSettingsButton = document.getElementById("open-settings-btn");
+  const backButton = document.getElementById("settings-back-btn");
+  const openLanguageButton = document.getElementById("open-language-from-settings");
+
+  if (pageTitle) pageTitle.textContent = t("settings_page_title");
+  if (openSettingsButton) openSettingsButton.setAttribute("aria-label", t("settings_open_aria"));
+  if (backButton) backButton.setAttribute("aria-label", t("settings_back_aria"));
+  if (openLanguageButton) openLanguageButton.setAttribute("aria-label", t("settings_language_aria"));
+
+  renderLanguageShortcut();
+}
+
+function renderLanguagePage() {
+  const title = document.getElementById("language-page-title");
+  const backButton = document.getElementById("language-back-btn");
+  const search = document.getElementById("language-page-search");
+  const list = document.getElementById("language-page-list");
+  const empty = document.getElementById("language-page-empty");
+  if (!title || !backButton || !search || !list || !empty) return;
+
+  title.textContent = t("language_page_title");
+  backButton.setAttribute("aria-label", t("language_page_back_aria"));
+  search.setAttribute("placeholder", t("locale_search_placeholder"));
+  list.setAttribute("aria-label", t("language_page_title"));
+  empty.textContent = t("locale_empty");
 
   const query = tokenize(state.localeSearch);
   const filtered = LOCALE_OPTIONS.filter((item) => {
     if (!query) return true;
-    const name = tokenize(t(`lang_${item.code}_name`));
-    const country = tokenize(t(`lang_${item.code}_country`));
+    const name = tokenize(getLocaleDisplayName(item.code));
+    const country = tokenize(getLocaleCountryName(item.code));
     const tokens = tokenize(item.tokens.join(" "));
     return name.includes(query)
       || country.includes(query)
@@ -795,14 +854,7 @@ function renderLocalePicker() {
   });
 
   list.innerHTML = "";
-
-  if (filtered.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "locale-empty";
-    empty.textContent = t("locale_empty");
-    list.append(empty);
-    return;
-  }
+  empty.classList.toggle("hidden", filtered.length > 0);
 
   filtered.forEach((item) => {
     const option = document.createElement("button");
@@ -812,14 +864,18 @@ function renderLocalePicker() {
 
     const flag = document.createElement("span");
     flag.className = "locale-option-flag";
-    flag.innerHTML = item.flagSvg;
+    if (item.flagSvg) {
+      flag.innerHTML = item.flagSvg;
+    } else {
+      flag.textContent = item.short;
+    }
 
     const textWrap = document.createElement("span");
     textWrap.className = "locale-option-text";
     const name = document.createElement("strong");
-    name.textContent = t(`lang_${item.code}_name`);
+    name.textContent = getLocaleDisplayName(item.code);
     const country = document.createElement("small");
-    country.textContent = t(`lang_${item.code}_country`);
+    country.textContent = getLocaleCountryName(item.code);
     textWrap.append(name, country);
 
     const code = document.createElement("span");
@@ -829,49 +885,69 @@ function renderLocalePicker() {
     option.append(flag, textWrap, code);
     option.addEventListener("click", () => {
       setLocale(item.code);
-      setLocaleMenuOpen(false);
+      if (typeof state.setTab === "function") {
+        state.setTab(state.languageReturnTab || "settings");
+      }
     });
     list.append(option);
   });
 }
 
-function setupLocalePicker() {
+function setupLanguagePage() {
   if (state.localeBound) return;
-  const picker = document.getElementById("locale-picker");
-  const menu = document.getElementById("locale-menu");
-  const toggle = document.getElementById("locale-toggle");
-  const search = document.getElementById("locale-search");
-  if (!picker || !menu || !toggle || !search) return;
+  const backButton = document.getElementById("language-back-btn");
+  const search = document.getElementById("language-page-search");
+  if (!backButton || !search) return;
 
-  setLocaleMenuOpen(false);
-
-  toggle.addEventListener("click", () => {
-    const next = !state.localeMenuOpen;
-    setLocaleMenuOpen(next);
-    if (next) {
-      search.focus();
-      search.select();
+  backButton.addEventListener("click", () => {
+    if (typeof state.setTab === "function") {
+      state.setTab(state.languageReturnTab || "settings");
     }
   });
 
   search.addEventListener("input", (event) => {
     state.localeSearch = event.target.value || "";
-    renderLocalePicker();
-  });
-
-  document.addEventListener("click", (event) => {
-    if (!state.localeMenuOpen) return;
-    if (picker.contains(event.target)) return;
-    setLocaleMenuOpen(false);
+    renderLanguagePage();
   });
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    if (!state.localeMenuOpen) return;
-    setLocaleMenuOpen(false);
+    if (state.activeTab !== "language") return;
+    if (typeof state.setTab === "function") {
+      state.setTab(state.languageReturnTab || "settings");
+    }
   });
 
   state.localeBound = true;
+}
+
+function setupSettingsPage() {
+  if (state.settingsBound) return;
+
+  const openSettingsButton = document.getElementById("open-settings-btn");
+  const backButton = document.getElementById("settings-back-btn");
+  const openLanguageButton = document.getElementById("open-language-from-settings");
+  const languageSearch = document.getElementById("language-page-search");
+
+  if (!openSettingsButton || !backButton || !openLanguageButton) return;
+
+  openSettingsButton.addEventListener("click", () => {
+    if (typeof state.setTab === "function") state.setTab("settings");
+  });
+
+  backButton.addEventListener("click", () => {
+    if (typeof state.setTab === "function") state.setTab("profile");
+  });
+
+  openLanguageButton.addEventListener("click", () => {
+    state.languageReturnTab = "settings";
+    state.localeSearch = "";
+    if (languageSearch) languageSearch.value = "";
+    renderLanguagePage();
+    if (typeof state.setTab === "function") state.setTab("language");
+  });
+
+  state.settingsBound = true;
 }
 
 function applyStaticLocalization() {
@@ -947,8 +1023,15 @@ function applyStaticLocalization() {
   if (handleNode) handleNode.setAttribute("aria-label", t("copy_hint"));
   if (idNode) idNode.setAttribute("aria-label", t("copy_hint"));
 
-  const localeList = document.getElementById("locale-list");
-  if (localeList) localeList.setAttribute("aria-label", t("locale_title"));
+  const languageSearch = document.getElementById("language-page-search");
+  const languageList = document.getElementById("language-page-list");
+  const languageBack = document.getElementById("language-back-btn");
+  if (languageSearch) languageSearch.setAttribute("placeholder", t("locale_search_placeholder"));
+  if (languageList) languageList.setAttribute("aria-label", t("language_page_title"));
+  if (languageBack) languageBack.setAttribute("aria-label", t("language_page_back_aria"));
+
+  setText("#settings-page-title", t("settings_page_title"));
+  setText("#settings-language-title", t("settings_language_title"));
 }
 
 function setLocale(nextLocale, options = {}) {
@@ -965,7 +1048,8 @@ function setLocale(nextLocale, options = {}) {
   }
 
   applyStaticLocalization();
-  renderLocalePicker();
+  renderSettingsPage();
+  renderLanguagePage();
   updateNetworkPill();
 
   if (typeof state.refreshWalletLocale === "function") {
@@ -984,7 +1068,8 @@ function setLocale(nextLocale, options = {}) {
 function setupLocalization() {
   const locale = detectPreferredLocale();
   setLocale(locale, { persist: false, rerender: false });
-  setupLocalePicker();
+  setupSettingsPage();
+  setupLanguagePage();
 }
 
 function nowMs() {
@@ -1128,6 +1213,14 @@ function renderAnalyticsRow() {
 }
 
 function loadPersistentData() {
+  try {
+    localStorage.removeItem("upnft_history_v1");
+    localStorage.removeItem("upnft_analytics_v1");
+    localStorage.removeItem("upnft_fair_v1");
+  } catch {
+    // Ignore storage errors.
+  }
+
   const savedHistory = readLocalJson(LOCAL_KEYS.history, []);
   state.history = safeArray(savedHistory).slice(0, HISTORY_LIMIT);
 
@@ -1827,17 +1920,15 @@ function buildNftModelFromTonapiItem(item, value, fallbackId) {
   };
 }
 
-async function fetchAccountNftItems(address) {
-  const owner = String(address || "").trim();
-  if (!owner) return [];
-
+async function fetchAccountNftItemsPage(owner, indirectOwnership) {
   const encodedOwner = encodeURIComponent(owner);
   const collected = [];
   let offset = 0;
   let hadResponse = false;
+  const indirectParam = typeof indirectOwnership === "boolean" ? `&indirect_ownership=${indirectOwnership}` : "";
 
   for (let page = 0; page < NFT_MAX_PAGES; page += 1) {
-    const url = `${TONAPI_BASE}/accounts/${encodedOwner}/nfts?limit=${NFT_PAGE_LIMIT}&offset=${offset}&indirect_ownership=false`;
+    const url = `${TONAPI_BASE}/accounts/${encodedOwner}/nfts?limit=${NFT_PAGE_LIMIT}&offset=${offset}${indirectParam}`;
     const payload = await fetchJsonWithTimeout(url, 12000);
     if (!payload) {
       if (!hadResponse) return null;
@@ -1853,6 +1944,23 @@ async function fetchAccountNftItems(address) {
   }
 
   return collected;
+}
+
+async function fetchAccountNftItems(address) {
+  const owner = String(address || "").trim();
+  if (!owner) return [];
+
+  const ownDirect = await fetchAccountNftItemsPage(owner, false);
+  if (ownDirect === null) return null;
+  if (ownDirect.length > 0) return ownDirect;
+
+  const ownIndirect = await fetchAccountNftItemsPage(owner, true);
+  if (ownIndirect === null) return ownDirect;
+  if (ownIndirect.length > 0) return ownIndirect;
+
+  const ownDefault = await fetchAccountNftItemsPage(owner, null);
+  if (ownDefault === null) return ownDirect;
+  return ownDefault.length > 0 ? ownDefault : ownDirect;
 }
 
 async function fetchCollectionMarketSnapshot(collectionAddress, ownerAddress) {
@@ -2124,28 +2232,41 @@ function setupTabs() {
   const sections = Array.from(document.querySelectorAll("[data-tab-section]"));
   const title = document.getElementById("screen-title");
   const subtitle = document.getElementById("screen-subtitle");
+  const bottomNav = document.querySelector(".bottom-nav");
+  const appShell = document.getElementById("app-shell");
+  const navTabs = new Set(buttons.map((button) => String(button.dataset.tab || "").trim()).filter(Boolean));
 
   const setTab = (nextTab) => {
+    const fallbackTab = "upgrades";
+    const targetTab = sections.some((section) => section.dataset.tabSection === nextTab) ? nextTab : fallbackTab;
+    const isMainTab = navTabs.has(targetTab);
+    state.activeTab = targetTab;
+
     buttons.forEach((button) => {
-      const isActive = button.dataset.tab === nextTab;
+      const isActive = isMainTab && button.dataset.tab === targetTab;
       button.classList.toggle("is-active", isActive);
       button.setAttribute("aria-current", isActive ? "page" : "false");
     });
 
     sections.forEach((section) => {
-      section.classList.toggle("is-active", section.dataset.tabSection === nextTab);
+      section.classList.toggle("is-active", section.dataset.tabSection === targetTab);
     });
 
-    const subtitleText = tabMeta[nextTab].subtitle || "";
-    title.textContent = tabMeta[nextTab].title;
+    const meta = tabMeta[targetTab] || tabMeta[fallbackTab];
+    const subtitleText = meta.subtitle || "";
+    title.textContent = meta.title || "";
     subtitle.textContent = subtitleText;
-    subtitle.classList.toggle("hidden", nextTab === "profile" || !subtitleText);
+    subtitle.classList.toggle("hidden", targetTab === "profile" || targetTab === "language" || !subtitleText);
+
+    if (bottomNav) bottomNav.classList.toggle("is-hidden", !isMainTab);
+    if (appShell) appShell.classList.toggle("is-internal-screen", !isMainTab);
   };
 
   buttons.forEach((button) => {
     button.addEventListener("click", () => setTab(button.dataset.tab));
   });
 
+  state.setTab = setTab;
   const defaultTab = document.querySelector(".nav-btn.is-active")?.dataset.tab || "upgrades";
   setTab(defaultTab);
 }
@@ -2447,6 +2568,13 @@ function calculateChance(source, target) {
   return clamp(rawChance, 3, 91);
 }
 
+function applyChanceOutcomeVisual() {
+  const chanceRing = document.getElementById("chance-ring");
+  if (!chanceRing) return;
+  chanceRing.classList.toggle("is-win", state.upgradeOutcome === "win");
+  chanceRing.classList.toggle("is-lose", state.upgradeOutcome === "lose");
+}
+
 function refreshUpgradeState() {
   ensureSelectedIds();
 
@@ -2463,6 +2591,7 @@ function refreshUpgradeState() {
     animateChanceTo(0, 460);
     note.textContent = t("note_select_nft");
     button.disabled = true;
+    applyChanceOutcomeVisual();
     return;
   }
 
@@ -2470,6 +2599,7 @@ function refreshUpgradeState() {
   animateChanceTo(chance, state.isSpinning ? 240 : 680);
   note.textContent = `${source.name} -> ${target.name}`;
   button.disabled = state.isSpinning;
+  applyChanceOutcomeVisual();
 }
 
 function spinArrowToResult(targetAngle) {
@@ -2525,15 +2655,10 @@ function applyUpgradeResult(success, source, target, landedAngle, chance, result
     state.data.dropped.unshift(minted);
   }
 
-  if (success) {
-    resultNode.textContent = t("result_win");
-    resultNode.classList.remove("fail");
-    resultNode.classList.add("success");
-  } else {
-    resultNode.textContent = t("result_loss");
-    resultNode.classList.remove("success");
-    resultNode.classList.add("fail");
-  }
+  state.upgradeOutcome = success ? "win" : "lose";
+  applyChanceOutcomeVisual();
+  resultNode.classList.remove("success", "fail");
+  resultNode.textContent = "";
 }
 
 function setupUpgradeFlow() {
@@ -2549,7 +2674,8 @@ function setupUpgradeFlow() {
 
     const chance = calculateChance(source, target);
     state.isSpinning = true;
-    recordAnalytics("upgradeAttempts");
+    state.upgradeOutcome = null;
+    applyChanceOutcomeVisual();
 
     actionButton.disabled = true;
     actionButton.textContent = t("button_upgrade_spin");
@@ -2560,6 +2686,7 @@ function setupUpgradeFlow() {
       const fairRoll = await getFairRoll(chance);
       const spinResult = await spinArrowToResult(fairRoll.targetAngle);
       applyUpgradeResult(fairRoll.success, source, target, spinResult.landed, chance, result);
+      recordAnalytics("upgradeAttempts");
 
       pushHistoryEntry({
         id: `h-${Date.now()}`,
@@ -2584,9 +2711,10 @@ function setupUpgradeFlow() {
       await rotateFairState();
     } catch (error) {
       console.error("Upgrade flow error:", error);
-      result.classList.remove("success");
-      result.classList.add("fail");
-      result.textContent = t("result_error");
+      state.upgradeOutcome = null;
+      applyChanceOutcomeVisual();
+      result.classList.remove("success", "fail");
+      result.textContent = "";
     } finally {
       state.isSpinning = false;
       actionButton.textContent = t("button_upgrade_start");
@@ -2650,7 +2778,8 @@ function setupProfileTabs() {
 
 function renderAll() {
   applyStaticLocalization();
-  renderLocalePicker();
+  renderSettingsPage();
+  renderLanguagePage();
   renderTasks();
   renderCases();
   renderBonuses();

@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
@@ -12,11 +12,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=2026-02-22-43">
+  <link rel="stylesheet" href="./styles.css?v=2026-02-22-50">
 
   <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
   <script defer src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-  <script defer src="./app.js?v=2026-02-22-43"></script>
+  <script defer src="./app.js?v=2026-02-22-50"></script>
 </head>
 <body>
   <main id="app-shell" class="app-shell">
@@ -35,16 +35,12 @@
         <span id="wallet-bubble-balance" class="wallet-bubble-balance">-- TON</span>
       </span>
     </div>
-    <div id="network-pill" class="network-pill hidden" role="status" aria-live="polite">
-      <span class="network-dot" aria-hidden="true"></span>
-      <span id="network-pill-text">Ожидание</span>
-    </div>
 
     <div class="sections-wrap">
       <section class="tab-section" data-tab-section="tasks">
         <div class="screen simple-screen">
           <div id="tasks-list" class="simple-list"></div>
-          <p id="tasks-empty" class="empty-note">Нет активных заданий.</p>
+          <p id="tasks-empty" class="empty-note">РќРµС‚ Р°РєС‚РёРІРЅС‹С… Р·Р°РґР°РЅРёР№.</p>
         </div>
       </section>
 
@@ -55,31 +51,16 @@
               <div class="target-block">
                 <p class="label" aria-hidden="true"></p>
                 <div class="list-controls">
-                  <input id="target-search" type="search" class="control-input" placeholder="Поиск цели">
+                  <input id="target-search" type="search" class="control-input" placeholder="РџРѕРёСЃРє С†РµР»Рё">
                   <select id="target-sort" class="control-select">
-                    <option value="value-asc">Цена: дешевые</option>
-                    <option value="value-desc">Цена: дорогие</option>
-                    <option value="name-asc">Имя: A-Z</option>
-                    <option value="name-desc">Имя: Z-A</option>
+                    <option value="value-asc">Р¦РµРЅР°: РґРµС€РµРІС‹Рµ</option>
+                    <option value="value-desc">Р¦РµРЅР°: РґРѕСЂРѕРіРёРµ</option>
+                    <option value="name-asc">РРјСЏ: A-Z</option>
+                    <option value="name-desc">РРјСЏ: Z-A</option>
                   </select>
                 </div>
                 <div id="target-nft-list" class="target-chip-list"></div>
-                <p id="target-empty" class="empty-note hidden">Цели недоступны.</p>
-              </div>
-
-              <section id="onboarding-panel" class="onboarding-panel hidden" aria-live="polite">
-                <h3 id="onboarding-title">Старт</h3>
-                <p id="onboarding-note">Подключи TON Wallet, чтобы загрузить NFT.</p>
-                <div class="onboarding-actions">
-                  <button id="onboarding-connect" class="ghost-btn" type="button">Подключить</button>
-                  <button id="onboarding-refresh" class="ghost-btn" type="button">Обновить NFT</button>
-                </div>
-              </section>
-
-              <div class="fair-box">
-                <span class="fair-label">Provably Fair</span>
-                <code id="fair-commitment">-</code>
-                <button id="copy-fair-btn" type="button">Копировать</button>
+                <p id="target-empty" class="empty-note hidden">Р¦РµР»Рё РЅРµРґРѕСЃС‚СѓРїРЅС‹.</p>
               </div>
 
               <div class="wheel-zone">
@@ -94,37 +75,29 @@
                   </div>
                   <div class="chance-core">
                     <strong id="chance-value">0%</strong>
-                    <small>Вероятность</small>
+                    <small>Р’РµСЂРѕСЏС‚РЅРѕСЃС‚СЊ</small>
                   </div>
                 </div>
               </div>
 
-              <p id="math-note" class="math-note">Выбери NFT</p>
-              <button id="upgrade-btn" class="primary-btn" type="button">Запустить апгрейд</button>
+              <p id="math-note" class="math-note">Р’С‹Р±РµСЂРё NFT</p>
+              <button id="upgrade-btn" class="primary-btn" type="button">Р—Р°РїСѓСЃС‚РёС‚СЊ Р°РїРіСЂРµР№Рґ</button>
               <p id="upgrade-result" class="upgrade-result" aria-live="polite"></p>
             </div>
 
             <div class="upgrade-side-col">
-              <h2 class="block-title">Мои NFT</h2>
+              <h2 class="block-title">РњРѕРё NFT</h2>
               <div class="list-controls">
-                <input id="own-search" type="search" class="control-input" placeholder="Поиск NFT">
+                <input id="own-search" type="search" class="control-input" placeholder="РџРѕРёСЃРє NFT">
                 <select id="own-sort" class="control-select">
-                  <option value="value-desc">Цена: дорогие</option>
-                  <option value="value-asc">Цена: дешевые</option>
-                  <option value="name-asc">Имя: A-Z</option>
-                  <option value="name-desc">Имя: Z-A</option>
+                  <option value="value-desc">Р¦РµРЅР°: РґРѕСЂРѕРіРёРµ</option>
+                  <option value="value-asc">Р¦РµРЅР°: РґРµС€РµРІС‹Рµ</option>
+                  <option value="name-asc">РРјСЏ: A-Z</option>
+                  <option value="name-desc">РРјСЏ: Z-A</option>
                 </select>
               </div>
               <div id="own-nft-list" class="nft-card-list"></div>
-              <p id="own-empty" class="empty-note">NFT не загружены.</p>
-              <section class="history-block">
-                <div class="history-head">
-                  <h3>История апгрейдов</h3>
-                  <button id="history-clear-btn" type="button">Очистить</button>
-                </div>
-                <div id="upgrade-history" class="history-list"></div>
-                <p id="history-empty" class="empty-note">Пока нет круток.</p>
-              </section>
+              <p id="own-empty" class="empty-note">NFT РЅРµ Р·Р°РіСЂСѓР¶РµРЅС‹.</p>
             </div>
           </div>
         </div>
@@ -133,23 +106,29 @@
       <section class="tab-section" data-tab-section="cases">
         <div class="screen simple-screen">
           <div id="cases-list" class="case-list"></div>
-          <p id="cases-empty" class="empty-note">Нет кейсов для текущего уровня.</p>
+          <p id="cases-empty" class="empty-note">РќРµС‚ РєРµР№СЃРѕРІ РґР»СЏ С‚РµРєСѓС‰РµРіРѕ СѓСЂРѕРІРЅСЏ.</p>
         </div>
       </section>
 
       <section class="tab-section" data-tab-section="bonuses">
         <div class="screen simple-screen">
           <div id="bonuses-list" class="simple-list"></div>
-          <p id="bonuses-empty" class="empty-note">Нет активных бонусов.</p>
+          <p id="bonuses-empty" class="empty-note">РќРµС‚ Р°РєС‚РёРІРЅС‹С… Р±РѕРЅСѓСЃРѕРІ.</p>
         </div>
       </section>
 
       <section class="tab-section" data-tab-section="profile">
         <div class="screen profile-screen">
           <div class="profile-top">
+            <button id="open-settings-btn" class="profile-settings-btn" type="button" aria-label="Open settings">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M12 3.5a2 2 0 0 1 2 2v.3a5.9 5.9 0 0 1 1.7.7l.2-.2a2 2 0 1 1 2.8 2.8l-.2.2c.3.5.5 1.1.7 1.7h.3a2 2 0 1 1 0 4h-.3a5.9 5.9 0 0 1-.7 1.7l.2.2a2 2 0 1 1-2.8 2.8l-.2-.2c-.5.3-1.1.5-1.7.7v.3a2 2 0 1 1-4 0v-.3a5.9 5.9 0 0 1-1.7-.7l-.2.2a2 2 0 1 1-2.8-2.8l.2-.2a5.9 5.9 0 0 1-.7-1.7h-.3a2 2 0 1 1 0-4h.3c.1-.6.4-1.2.7-1.7l-.2-.2a2 2 0 1 1 2.8-2.8l.2.2c.5-.3 1.1-.5 1.7-.7v-.3a2 2 0 0 1 2-2Z" />
+                <circle cx="12" cy="12" r="2.7" />
+              </svg>
+            </button>
             <div id="profile-avatar" class="profile-avatar">U</div>
             <div class="profile-meta">
-              <h2 id="profile-name">Гость</h2>
+              <h2 id="profile-name">Р“РѕСЃС‚СЊ</h2>
               <div class="profile-subline">
                 <p id="profile-handle">@guest</p>
                 <small id="profile-id" class="profile-id hidden"></small>
@@ -157,36 +136,13 @@
             </div>
           </div>
 
-          <section id="locale-picker" class="locale-picker">
-            <div class="locale-head">
-              <span id="locale-title">Язык</span>
-              <button id="locale-toggle" class="locale-toggle" type="button" aria-expanded="false" aria-label="Выбрать язык">
-                <span id="locale-current-flag" class="locale-current-flag" aria-hidden="true"></span>
-                <span id="locale-current-code" class="locale-current-code">RU</span>
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </button>
-            </div>
-            <div id="locale-menu" class="locale-menu hidden">
-              <label class="locale-search-wrap" for="locale-search">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m16.5 16.5 4 4" />
-                </svg>
-                <input id="locale-search" class="locale-search" type="search" placeholder="Поиск языка или страны">
-              </label>
-              <div id="locale-list" class="locale-list" role="listbox" aria-label="Список языков"></div>
-            </div>
-          </section>
-
           <div class="stat-row">
             <div>
               <span>NFT</span>
               <strong id="stat-nft-count">-</strong>
             </div>
             <div>
-              <span>Апгрейдов</span>
+              <span>РђРїРіСЂРµР№РґРѕРІ</span>
               <strong id="stat-upgrades">-</strong>
             </div>
             <div>
@@ -194,74 +150,124 @@
               <strong id="stat-winrate">-</strong>
             </div>
           </div>
-          <div id="analytics-row" class="analytics-row"></div>
 
           <button id="connect-wallet-btn" class="wallet-btn" type="button">
             <span class="wallet-btn-inner">
               <svg class="wallet-btn-icon" viewBox="0 0 56 56" aria-hidden="true" focusable="false">
                 <path d="M28 6.8h17.6c3.4 0 5.6 3.7 3.9 6.7L31.5 43.8c-1.6 2.8-5.6 2.8-7.2 0L6.5 13.5c-1.7-3 .5-6.7 3.9-6.7H28Zm0 7.4H14.3l13.7 23.3 13.7-23.3H28Z"/>
               </svg>
-              <span class="wallet-btn-text">Подключить кошелек</span>
+              <span class="wallet-btn-text">РџРѕРґРєР»СЋС‡РёС‚СЊ РєРѕС€РµР»РµРє</span>
             </span>
           </button>
-          <p id="wallet-short" class="wallet-short">Кошелек не подключен</p>
+          <p id="wallet-short" class="wallet-short">РљРѕС€РµР»РµРє РЅРµ РїРѕРґРєР»СЋС‡РµРЅ</p>
 
           <div class="profile-tabs">
-            <button class="profile-tab-btn is-active" data-profile-tab="my" type="button">Мои NFT</button>
-            <button class="profile-tab-btn" data-profile-tab="dropped" type="button">Выбитые NFT</button>
+            <button class="profile-tab-btn is-active" data-profile-tab="my" type="button">РњРѕРё NFT</button>
+            <button class="profile-tab-btn" data-profile-tab="dropped" type="button">Р’С‹Р±РёС‚С‹Рµ NFT</button>
           </div>
 
           <div id="my-nft-grid" class="profile-nft-grid is-active" data-profile-grid="my"></div>
-          <p id="my-empty" class="empty-note">NFT пока нет.</p>
+          <p id="my-empty" class="empty-note">NFT РїРѕРєР° РЅРµС‚.</p>
 
           <div id="dropped-nft-grid" class="profile-nft-grid" data-profile-grid="dropped"></div>
-          <p id="dropped-empty" class="empty-note hidden">Выбитых NFT пока нет.</p>
+          <p id="dropped-empty" class="empty-note hidden">Р’С‹Р±РёС‚С‹С… NFT РїРѕРєР° РЅРµС‚.</p>
+        </div>
+      </section>
+
+      <section class="tab-section" data-tab-section="settings">
+        <div class="screen settings-screen">
+          <div class="settings-top">
+            <button id="settings-back-btn" class="settings-back-btn" type="button" aria-label="Back to profile">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="m15 5-7 7 7 7" />
+              </svg>
+            </button>
+            <h2 id="settings-page-title">Settings</h2>
+          </div>
+
+          <div class="settings-list">
+            <button id="open-language-from-settings" class="settings-item" type="button" aria-label="Open language settings">
+              <span class="settings-item-left">
+                <span class="settings-item-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M4 7h16M8 3v4M16 3v4M9 17h6M12 13v8" />
+                  </svg>
+                </span>
+                <span id="settings-language-title" class="settings-item-title">Language</span>
+              </span>
+              <span id="settings-language-value" class="settings-item-value">English</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-section" data-tab-section="language">
+        <div class="screen language-screen">
+          <div class="language-top">
+            <button id="language-back-btn" class="language-back-btn" type="button" aria-label="Back to profile">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="m15 5-7 7 7 7" />
+              </svg>
+            </button>
+            <h2 id="language-page-title">Languages</h2>
+          </div>
+
+          <label class="locale-search-wrap language-search-wrap" for="language-page-search">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m16.5 16.5 4 4" />
+            </svg>
+            <input id="language-page-search" class="locale-search" type="search" placeholder="Search language or country">
+          </label>
+
+          <div id="language-page-list" class="locale-list language-list" role="listbox" aria-label="Languages"></div>
+          <p id="language-page-empty" class="locale-empty hidden">Nothing found</p>
         </div>
       </section>
     </div>
   </main>
 
-  <nav class="bottom-nav" aria-label="Навигация">
-    <button class="nav-btn" data-tab="tasks" type="button" aria-label="Задания">
+  <nav class="bottom-nav" aria-label="РќР°РІРёРіР°С†РёСЏ">
+    <button class="nav-btn" data-tab="tasks" type="button" aria-label="Р—Р°РґР°РЅРёСЏ">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M10 6h10M10 12h10M10 18h10" />
         <path d="m4 6 1.6 1.6L8 5.2" />
         <path d="m4 12 1.6 1.6L8 11.2" />
         <path d="m4 18 1.6 1.6L8 17.2" />
       </svg>
-      <span>Задания</span>
+      <span>Р—Р°РґР°РЅРёСЏ</span>
     </button>
 
-    <button class="nav-btn is-active" data-tab="upgrades" type="button" aria-label="Апгрейды">
+    <button class="nav-btn is-active" data-tab="upgrades" type="button" aria-label="РђРїРіСЂРµР№РґС‹">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M4 16l6-6 4 4 6-6" />
         <path d="M16 8h4v4" />
       </svg>
-      <span>Апгрейды</span>
+      <span>РђРїРіСЂРµР№РґС‹</span>
     </button>
 
-    <button class="nav-btn" data-tab="cases" type="button" aria-label="Кейсы">
+    <button class="nav-btn" data-tab="cases" type="button" aria-label="РљРµР№СЃС‹">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M4 9h16a1 1 0 0 1 1 1v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a1 1 0 0 1 1-1Z" />
         <path d="M9 9V7a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
         <path d="M3 13h18" />
       </svg>
-      <span>Кейсы</span>
+      <span>РљРµР№СЃС‹</span>
     </button>
 
-    <button class="nav-btn" data-tab="bonuses" type="button" aria-label="Бонусы">
+    <button class="nav-btn" data-tab="bonuses" type="button" aria-label="Р‘РѕРЅСѓСЃС‹">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M3 8h18v4H3z" />
         <path d="M5 12h14v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z" />
         <path d="M12 8v14" />
         <path d="M12 8H9a2 2 0 1 1 0-4c2 0 3 4 3 4Zm0 0h3a2 2 0 1 0 0-4c-2 0-3 4-3 4Z" />
       </svg>
-      <span>Бонусы</span>
+      <span>Р‘РѕРЅСѓСЃС‹</span>
     </button>
 
-    <button class="nav-btn profile-nav" data-tab="profile" type="button" aria-label="Вы">
+    <button class="nav-btn profile-nav" data-tab="profile" type="button" aria-label="Р’С‹">
       <span id="nav-avatar" class="nav-avatar">U</span>
-      <span>Вы</span>
+      <span>Р’С‹</span>
     </button>
   </nav>
 </body>
