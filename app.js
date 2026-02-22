@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-35";
+const APP_VERSION = "2026-02-22-39";
 
 const tabMeta = {
   tasks: {
@@ -65,10 +65,13 @@ const state = {
   selectedTargetId: null,
   profileTab: "my",
   profileTabsBound: false,
+  profileCopyBound: false,
   tonConnectUI: null,
   orbitAngle: 0,
   isSpinning: false,
   spinRafId: null,
+  chanceRafId: null,
+  displayedChance: 0,
 };
 
 function clamp(value, min, max) {
@@ -84,6 +87,11 @@ function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3);
 }
 
+function easeInOutCubic(t) {
+  if (t < 0.5) return 4 * t * t * t;
+  return 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -91,6 +99,15 @@ function safeArray(value) {
 function toNumber(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
+}
+
+function randomUnit() {
+  if (window.crypto?.getRandomValues) {
+    const values = new Uint32Array(1);
+    window.crypto.getRandomValues(values);
+    return values[0] / 4294967296;
+  }
+  return Math.random();
 }
 
 function firstNonEmptyString(...values) {
@@ -123,11 +140,146 @@ function hideElementById(id, hidden) {
   element.classList.toggle("hidden", hidden);
 }
 
+async function copyTextToClipboard(text) {
+  const payload = String(text ?? "").trim();
+  if (!payload) return false;
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(payload);
+      return true;
+    }
+  } catch {
+    // Continue to fallback.
+  }
+
+  try {
+    const temp = document.createElement("textarea");
+    temp.value = payload;
+    temp.setAttribute("readonly", "");
+    temp.style.position = "fixed";
+    temp.style.opacity = "0";
+    temp.style.pointerEvents = "none";
+    document.body.append(temp);
+    temp.select();
+    const copied = document.execCommand("copy");
+    temp.remove();
+    return copied;
+  } catch {
+    return false;
+  }
+}
+
+function showCopyFeedback(node) {
+  if (!node) return;
+  if (!node.dataset.copyLabel) {
+    node.dataset.copyLabel = node.textContent || "";
+  }
+
+  if (node.__copyTimer) {
+    clearTimeout(node.__copyTimer);
+  }
+
+  node.textContent = "\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u043D\u043E";
+  node.classList.add("is-copied");
+
+  node.__copyTimer = setTimeout(() => {
+    node.textContent = node.dataset.copyLabel || node.textContent || "";
+    node.classList.remove("is-copied");
+    node.__copyTimer = null;
+  }, 950);
+}
+
+function setupProfileCopyActions() {
+  if (state.profileCopyBound) return;
+
+  const handleNode = document.getElementById("profile-handle");
+  const idNode = document.getElementById("profile-id");
+  const copyNodes = [handleNode, idNode].filter(Boolean);
+
+  copyNodes.forEach((node) => {
+    node.tabIndex = 0;
+    node.setAttribute("role", "button");
+    node.setAttribute("aria-label", "\u041D\u0430\u0436\u043C\u0438\u0442\u0435, \u0447\u0442\u043E\u0431\u044B \u0441\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C");
+
+    const triggerCopy = async () => {
+      const value = String(node.dataset.copyValue || "").trim();
+      if (!value) return;
+      const copied = await copyTextToClipboard(value);
+      if (copied) showCopyFeedback(node);
+    };
+
+    node.addEventListener("click", () => {
+      void triggerCopy();
+    });
+
+    node.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      void triggerCopy();
+    });
+  });
+
+  state.profileCopyBound = true;
+}
+
 function setOrbitAngle(angle) {
   state.orbitAngle = angle;
   const orbit = document.querySelector(".chance-orbit");
   if (!orbit) return;
   orbit.style.transform = `rotate(${angle}deg)`;
+}
+
+function paintChance(value) {
+  const chanceRing = document.getElementById("chance-ring");
+  const chanceValue = document.getElementById("chance-value");
+  if (!chanceRing || !chanceValue) return;
+
+  const normalized = clamp(toNumber(value, 0), 0, 100);
+  state.displayedChance = normalized;
+  chanceRing.style.setProperty("--chance", normalized.toFixed(4));
+  chanceValue.textContent = `${normalized.toFixed(1)}%`;
+}
+
+function stopChanceAnimation() {
+  if (!state.chanceRafId) return;
+  cancelAnimationFrame(state.chanceRafId);
+  state.chanceRafId = null;
+}
+
+function animateChanceTo(targetChance, duration = 620) {
+  const chanceRing = document.getElementById("chance-ring");
+  const chanceValue = document.getElementById("chance-value");
+  if (!chanceRing || !chanceValue) return;
+
+  stopChanceAnimation();
+
+  const start = clamp(toNumber(state.displayedChance, 0), 0, 100);
+  const end = clamp(toNumber(targetChance, 0), 0, 100);
+  const totalTime = Math.max(200, toNumber(duration, 620));
+
+  if (Math.abs(end - start) < 0.05) {
+    paintChance(end);
+    return;
+  }
+
+  const startedAt = performance.now();
+  const step = (now) => {
+    const progress = clamp((now - startedAt) / totalTime, 0, 1);
+    const eased = easeInOutCubic(progress);
+    const value = start + ((end - start) * eased);
+    paintChance(value);
+
+    if (progress < 1) {
+      state.chanceRafId = requestAnimationFrame(step);
+      return;
+    }
+
+    state.chanceRafId = null;
+    paintChance(end);
+  };
+
+  state.chanceRafId = requestAnimationFrame(step);
 }
 
 function formatTon(value) {
@@ -1007,41 +1159,44 @@ function refreshUpgradeState() {
   const chance = calculateChance(source, target);
 
   const chanceRing = document.getElementById("chance-ring");
-  const chanceValue = document.getElementById("chance-value");
   const note = document.getElementById("math-note");
   const button = document.getElementById("upgrade-btn");
 
   if (!source || !target) {
     chanceRing.classList.add("is-empty");
-    chanceRing.style.setProperty("--chance", "0");
-    chanceValue.textContent = "0%";
-    note.textContent = "Выбери NFT";
+    animateChanceTo(0, 460);
+    note.textContent = "\u0412\u044b\u0431\u0435\u0440\u0438 NFT";
     button.disabled = true;
     return;
   }
 
   chanceRing.classList.remove("is-empty");
-  chanceRing.style.setProperty("--chance", chance.toFixed(2));
-  chanceValue.textContent = `${chance.toFixed(1)}%`;
-  note.textContent = `${source.name} → ${target.name}`;
+  animateChanceTo(chance, state.isSpinning ? 240 : 680);
+  note.textContent = `${source.name} -> ${target.name}`;
   button.disabled = state.isSpinning;
 }
 
 function spinArrowToResult(chancePercent) {
-  const chanceDegrees = chancePercent * 3.6;
-  const targetAngle = Math.random() * 360;
+  const chanceDegrees = clamp(chancePercent, 0, 100) * 3.6;
+  // One unbiased random landing angle defines the result; animation only visualizes it.
+  const targetAngle = randomUnit() * 360;
   const currentNormalized = normalizeAngle(state.orbitAngle);
   const deltaToTarget = (targetAngle - currentNormalized + 360) % 360;
-  const extraSpins = 5 + Math.floor(Math.random() * 3);
+  const extraSpins = 6 + Math.floor(randomUnit() * 3);
   const totalDelta = (extraSpins * 360) + deltaToTarget;
   const startAngle = state.orbitAngle;
-  const duration = 2600 + Math.random() * 700;
+  const duration = 3300 + randomUnit() * 900;
   const startTime = performance.now();
+
+  if (state.spinRafId) {
+    cancelAnimationFrame(state.spinRafId);
+    state.spinRafId = null;
+  }
 
   return new Promise((resolve) => {
     const step = (now) => {
       const progress = clamp((now - startTime) / duration, 0, 1);
-      const eased = easeOutCubic(progress);
+      const eased = 1 - Math.pow(1 - progress, 4);
       const angle = startAngle + (totalDelta * eased);
       setOrbitAngle(angle);
 
@@ -1052,6 +1207,7 @@ function spinArrowToResult(chancePercent) {
 
       state.spinRafId = null;
       const landed = normalizeAngle(startAngle + totalDelta);
+      setOrbitAngle(landed);
       const success = landed <= chanceDegrees;
       resolve({ success, landed });
     };
@@ -1135,7 +1291,6 @@ function refreshProfileStats() {
   const won = Math.max(0, stats.upgradesWon);
   const winrate = total > 0 ? (won / total) * 100 : null;
 
-  document.getElementById("profile-rank").textContent = stats.rank ?? "-";
   document.getElementById("stat-nft-count").textContent = String(nftCount);
   document.getElementById("stat-upgrades").textContent = total > 0 ? String(total) : "-";
   document.getElementById("stat-winrate").textContent = winrate === null ? "-" : `${winrate.toFixed(1)}%`;
@@ -1188,24 +1343,59 @@ function setAvatar(container, user) {
 
   const seed = (user.first_name || user.username || "U").trim();
   const initial = seed ? seed[0].toUpperCase() : "U";
-
-  if (!user.photo_url) {
+  const resetToInitial = () => {
     container.textContent = initial;
+  };
+
+  const avatarUrl = normalizeMediaUrl(firstNonEmptyString(
+    user?.video_avatar_url,
+    user?.videoAvatarUrl,
+    user?.avatar_url,
+    user?.avatarUrl,
+    user?.photo_url,
+    user?.photoUrl,
+  ));
+
+  if (!avatarUrl) {
+    resetToInitial();
     return;
   }
 
-  const img = document.createElement("img");
-  img.src = user.photo_url;
-  img.alt = "User avatar";
-  img.loading = "lazy";
-  img.referrerPolicy = "no-referrer";
-  container.replaceChildren(img);
+  const applyImage = (url) => {
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = "User avatar";
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.referrerPolicy = "no-referrer";
+    img.onerror = () => resetToInitial();
+    container.replaceChildren(img);
+  };
+
+  if (isLikelyVideoUrl(avatarUrl)) {
+    const video = document.createElement("video");
+    video.src = avatarUrl;
+    video.autoplay = true;
+    video.muted = true;
+    video.loop = true;
+    video.playsInline = true;
+    video.setAttribute("webkit-playsinline", "");
+    video.setAttribute("playsinline", "");
+    video.setAttribute("aria-label", "User avatar");
+    video.preload = "metadata";
+    video.onerror = () => applyImage(avatarUrl);
+    container.replaceChildren(video);
+    return;
+  }
+
+  applyImage(avatarUrl);
 }
 
 function applyUserProfile(user) {
   const fullNameRaw = [user.first_name, user.last_name].filter(Boolean).join(" ");
   const fullName = normalizeDisplayName(fullNameRaw) || "Гость";
   const handle = user.username ? `@${String(user.username).trim()}` : "";
+  const fullId = user?.id !== undefined && user?.id !== null ? String(user.id).trim() : "";
   const compactId = shortUserId(user.id);
 
   const nameNode = document.getElementById("profile-name");
@@ -1215,13 +1405,22 @@ function applyUserProfile(user) {
   nameNode.textContent = fullName;
   handleNode.textContent = handle;
   handleNode.classList.toggle("hidden", !handle);
+  handleNode.dataset.copyLabel = handle;
+  handleNode.dataset.copyValue = handle;
+  handleNode.setAttribute("title", handle ? "\u041D\u0430\u0436\u043C\u0438, \u0447\u0442\u043E\u0431\u044B \u0441\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C username" : "");
 
   if (compactId) {
     idNode.textContent = `ID ${compactId}`;
     idNode.classList.remove("hidden");
+    idNode.dataset.copyLabel = `ID ${compactId}`;
+    idNode.dataset.copyValue = fullId || compactId;
+    idNode.setAttribute("title", "\u041D\u0430\u0436\u043C\u0438, \u0447\u0442\u043E\u0431\u044B \u0441\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C ID");
   } else {
     idNode.textContent = "";
     idNode.classList.add("hidden");
+    idNode.dataset.copyLabel = "";
+    idNode.dataset.copyValue = "";
+    idNode.setAttribute("title", "");
   }
 
   setAvatar(document.getElementById("profile-avatar"), user);
@@ -1229,6 +1428,7 @@ function applyUserProfile(user) {
 }
 
 function setupTelegramUser() {
+
   const tg = window.Telegram?.WebApp;
   if (!tg) {
     applyUserProfile(fallbackUser);
@@ -1255,7 +1455,6 @@ function setupTonConnect() {
   const walletShort = document.getElementById("wallet-short");
   const walletBubble = document.getElementById("wallet-bubble");
   const walletBubbleBalance = document.getElementById("wallet-bubble-balance");
-  const walletBubbleAddress = document.getElementById("wallet-bubble-address");
   const appShell = document.getElementById("app-shell");
   let balanceRefreshTimer = null;
   let balanceRequestToken = 0;
@@ -1279,11 +1478,9 @@ function setupTonConnect() {
     }
   };
 
-  const setBubbleState = (connected, address = "") => {
+  const setBubbleState = (connected) => {
     walletBubble.classList.toggle("hidden", !connected);
     appShell.classList.toggle("has-wallet", connected);
-    if (!connected) return;
-    walletBubbleAddress.textContent = shortAddress(address);
   };
 
   const loadWalletBalance = async (address) => {
@@ -1377,7 +1574,7 @@ function setupTonConnect() {
     setWalletButtonText("Connect Wallet");
     connectButton.classList.toggle("hidden", connected);
     connectButton.disabled = false;
-    setBubbleState(connected, address);
+    setBubbleState(connected);
 
     if (connected) {
       walletShort.textContent = "Синхронизация NFT...";
@@ -1387,7 +1584,6 @@ function setupTonConnect() {
       stopBalancePolling();
       stopNftPolling();
       walletBubbleBalance.textContent = "-- TON";
-      walletBubbleAddress.textContent = "...";
       walletShort.textContent = "Кошелек не подключен";
       void loadAppData().then(() => {
         renderAll();
@@ -1415,7 +1611,9 @@ function setupTonConnect() {
 async function bootstrap() {
   setupTabs();
   setupTelegramUser();
+  setupProfileCopyActions();
   setOrbitAngle(state.orbitAngle);
+  paintChance(state.displayedChance);
   setupUpgradeFlow();
 
   renderAll();
@@ -1425,4 +1623,3 @@ async function bootstrap() {
 }
 
 bootstrap();
-
