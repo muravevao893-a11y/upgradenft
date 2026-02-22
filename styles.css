@@ -1,26 +1,26 @@
-﻿:root {
-  --bg-0: #05060a;
-  --bg-1: #0a0f18;
-  --bg-2: #101826;
-  --bg-3: #172235;
+:root {
+  --bg-0: #000000;
+  --bg-1: #050505;
+  --bg-2: #0a0a0a;
+  --bg-3: #111111;
 
-  --surface: rgba(18, 25, 39, 0.76);
-  --surface-strong: #141c2b;
-  --surface-soft: #1a2436;
-  --surface-alt: #1c2840;
+  --surface: rgba(12, 12, 12, 0.8);
+  --surface-strong: #121212;
+  --surface-soft: #171717;
+  --surface-alt: #1f1f1f;
 
-  --stroke: rgba(162, 183, 217, 0.22);
-  --stroke-strong: rgba(191, 208, 234, 0.38);
+  --stroke: rgba(255, 255, 255, 0.12);
+  --stroke-strong: rgba(255, 255, 255, 0.24);
 
-  --text-1: #f4f8ff;
-  --text-2: #b7c5dd;
-  --text-3: #8898b4;
+  --text-1: #f5f5f5;
+  --text-2: #c4c4c4;
+  --text-3: #8e8e8e;
 
-  --accent: #6de9cf;
-  --accent-2: #8ab5ff;
-  --accent-3: #ffd29b;
-  --success: #76e3a1;
-  --danger: #ff838f;
+  --accent: #e8e8e8;
+  --accent-2: #bdbdbd;
+  --accent-3: #8f8f8f;
+  --success: #9dcaa8;
+  --danger: #ff8f8f;
 
   --radius-xl: 24px;
   --radius-lg: 18px;
@@ -50,10 +50,10 @@ body {
   font-family: "Manrope", "Segoe UI", system-ui, sans-serif;
   color: var(--text-1);
   background:
-    radial-gradient(920px 640px at -12% -18%, rgba(109, 233, 207, 0.11), transparent 64%),
-    radial-gradient(760px 560px at 112% -8%, rgba(138, 181, 255, 0.12), transparent 66%),
-    radial-gradient(640px 460px at 50% 120%, rgba(255, 210, 155, 0.06), transparent 72%),
-    linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 42%, var(--bg-0) 100%);
+    radial-gradient(920px 640px at -12% -18%, rgba(255, 255, 255, 0.07), transparent 64%),
+    radial-gradient(760px 560px at 112% -8%, rgba(255, 255, 255, 0.08), transparent 66%),
+    radial-gradient(640px 460px at 50% 120%, rgba(255, 255, 255, 0.04), transparent 72%),
+    linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 46%, var(--bg-0) 100%);
   display: flex;
   justify-content: center;
   -webkit-font-smoothing: antialiased;
@@ -116,11 +116,11 @@ h2 {
   min-width: 106px;
   height: 38px;
   padding: 4px 9px;
-  border: 1px solid rgba(181, 204, 239, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.26);
   border-radius: 13px;
   background:
-    radial-gradient(110px 64px at 110% -35%, rgba(124, 184, 255, 0.18), transparent 72%),
-    linear-gradient(180deg, rgba(26, 36, 54, 0.58) 0%, rgba(18, 26, 40, 0.58) 100%);
+    radial-gradient(110px 64px at 110% -35%, rgba(255, 255, 255, 0.1), transparent 72%),
+    linear-gradient(180deg, rgba(18, 18, 18, 0.72) 0%, rgba(10, 10, 10, 0.72) 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     inset 0 0 0 1px rgba(255, 255, 255, 0.03),
@@ -142,10 +142,10 @@ h2 {
   height: 20px;
   flex: 0 0 20px;
   border-radius: 50%;
-  border: 1px solid rgba(188, 212, 247, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   background:
     radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.24), transparent 54%),
-    linear-gradient(180deg, rgba(64, 100, 156, 0.55), rgba(33, 56, 91, 0.55));
+    linear-gradient(180deg, rgba(82, 82, 82, 0.45), rgba(38, 38, 38, 0.55));
   display: grid;
   place-items: center;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
@@ -158,7 +158,7 @@ h2 {
 }
 
 .wallet-bubble-ton path {
-  fill: #8fc9ff;
+  fill: #f5f5f5;
 }
 
 .wallet-bubble-text {
@@ -297,7 +297,7 @@ svg {
 .nft-card-list::-webkit-scrollbar-thumb,
 .profile-nft-grid::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(139, 159, 190, 0.55);
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .simple-item {
@@ -305,8 +305,8 @@ svg {
   border: 1px solid var(--stroke);
   border-radius: var(--radius-md);
   background:
-    radial-gradient(180px 110px at 92% -40%, rgba(109, 233, 207, 0.08), transparent 74%),
-    linear-gradient(180deg, rgba(30, 41, 61, 0.86), rgba(22, 31, 47, 0.86));
+    radial-gradient(180px 110px at 92% -40%, rgba(255, 255, 255, 0.05), transparent 74%),
+    linear-gradient(180deg, rgba(24, 24, 24, 0.88), rgba(14, 14, 14, 0.88));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     var(--shadow-soft);
@@ -365,8 +365,8 @@ svg {
   align-content: end;
   gap: 6px;
   background:
-    radial-gradient(130px 86px at 100% -16%, rgba(138, 181, 255, 0.14), transparent 70%),
-    linear-gradient(180deg, rgba(30, 43, 65, 0.82), rgba(22, 31, 47, 0.82));
+    radial-gradient(130px 86px at 100% -16%, rgba(255, 255, 255, 0.09), transparent 70%),
+    linear-gradient(180deg, rgba(23, 23, 23, 0.86), rgba(13, 13, 13, 0.86));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     var(--shadow-soft);
@@ -417,7 +417,7 @@ svg {
   border: 1px solid var(--stroke);
   border-radius: 14px;
   background:
-    linear-gradient(180deg, rgba(31, 43, 64, 0.92), rgba(22, 31, 47, 0.92));
+    linear-gradient(180deg, rgba(23, 23, 23, 0.92), rgba(13, 13, 13, 0.92));
   color: var(--text-1);
   padding: 10px 11px;
   text-align: left;
@@ -450,10 +450,10 @@ svg {
 }
 
 .target-chip.is-active {
-  border-color: rgba(145, 233, 214, 0.64);
+  border-color: rgba(255, 255, 255, 0.54);
   box-shadow:
-    inset 0 0 0 1px rgba(109, 233, 207, 0.26),
-    0 0 0 1px rgba(109, 233, 207, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    0 0 0 1px rgba(255, 255, 255, 0.1),
     0 10px 26px rgba(11, 15, 24, 0.45);
 }
 
@@ -474,12 +474,12 @@ svg {
   place-items: center;
   background:
     radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.16), transparent 56%),
-    radial-gradient(circle at 50% 52%, #121a2b 0%, #0c1321 66%, #090f19 100%);
+    radial-gradient(circle at 50% 52%, #111111 0%, #070707 66%, #040404 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.13),
     inset 0 0 52px rgba(0, 0, 0, 0.45),
     0 18px 42px rgba(0, 0, 0, 0.52),
-    0 0 24px rgba(138, 181, 255, 0.14);
+    0 0 24px rgba(255, 255, 255, 0.09);
   animation: chance-ring-pulse 4.8s ease-in-out infinite;
 }
 
@@ -501,9 +501,9 @@ svg {
   background:
     conic-gradient(
       from -90deg,
-      #86f3de 0 calc(var(--chance) * 0.64%),
-      #8bb9ff calc(var(--chance) * 1%),
-      #515d77 calc(var(--chance) * 1%) 100%
+      #f2f2f2 0 calc(var(--chance) * 0.64%),
+      #cfcfcf calc(var(--chance) * 1%),
+      #3a3a3a calc(var(--chance) * 1%) 100%
     );
   -webkit-mask: radial-gradient(
     farthest-side,
@@ -522,10 +522,10 @@ svg {
   position: absolute;
   inset: 23px;
   border-radius: 50%;
-  border: 1px solid rgba(177, 197, 227, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   background:
     radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.14), transparent 52%),
-    linear-gradient(180deg, #141d2d 0%, #0f1623 100%);
+    linear-gradient(180deg, #121212 0%, #0b0b0b 100%);
   box-shadow:
     inset 0 0 28px rgba(0, 0, 0, 0.54),
     inset 0 0 0 1px rgba(255, 255, 255, 0.05);
@@ -604,10 +604,10 @@ svg {
   border-radius: 999px;
   transform: translate(-50%, -50%);
   background:
-    radial-gradient(circle at 34% 30%, #ffffff 0 26%, #e9f6ff 27% 54%, #b6d8ff 55% 100%);
+    radial-gradient(circle at 34% 30%, #ffffff 0 26%, #efefef 27% 54%, #c9c9c9 55% 100%);
   box-shadow:
-    0 0 0 2px #10192a,
-    0 0 14px rgba(137, 184, 255, 0.52);
+    0 0 0 2px #0f0f0f,
+    0 0 14px rgba(255, 255, 255, 0.32);
 }
 
 .chance-orbit::after {
@@ -618,9 +618,9 @@ svg {
   background: conic-gradient(
     from -90deg,
     rgba(236, 246, 255, 0.95) 0deg,
-    rgba(138, 181, 255, 0.52) 18deg,
-    rgba(138, 181, 255, 0.09) 64deg,
-    rgba(138, 181, 255, 0) 148deg
+    rgba(255, 255, 255, 0.45) 18deg,
+    rgba(255, 255, 255, 0.08) 64deg,
+    rgba(255, 255, 255, 0) 148deg
   );
   -webkit-mask: radial-gradient(
     farthest-side,
@@ -651,7 +651,7 @@ svg {
   line-height: 0.9;
   font-weight: 800;
   letter-spacing: -0.03em;
-  text-shadow: 0 6px 22px rgba(138, 181, 255, 0.26);
+  text-shadow: 0 6px 22px rgba(255, 255, 255, 0.16);
 }
 
 .chance-core small {
@@ -681,8 +681,8 @@ svg {
   border: 1px solid var(--stroke);
   border-radius: 15px;
   background:
-    radial-gradient(220px 120px at 110% -60%, rgba(109, 233, 207, 0.16), transparent 68%),
-    linear-gradient(180deg, rgba(40, 56, 83, 0.88) 0%, rgba(26, 37, 57, 0.88) 100%);
+    radial-gradient(220px 120px at 110% -60%, rgba(255, 255, 255, 0.11), transparent 68%),
+    linear-gradient(180deg, rgba(24, 24, 24, 0.92) 0%, rgba(12, 12, 12, 0.92) 100%);
   color: var(--text-1);
   font-family: inherit;
   font-size: 18px;
@@ -696,7 +696,7 @@ svg {
   border-color: var(--stroke-strong);
   box-shadow:
     0 12px 26px rgba(0, 0, 0, 0.42),
-    0 0 20px rgba(138, 181, 255, 0.14);
+    0 0 20px rgba(255, 255, 255, 0.09);
 }
 
 .primary-btn:active {
@@ -750,7 +750,7 @@ svg {
   padding: 0;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(30, 42, 64, 0.9) 0%, rgba(22, 31, 47, 0.9) 100%);
+    linear-gradient(180deg, rgba(22, 22, 22, 0.92) 0%, rgba(12, 12, 12, 0.92) 100%);
   color: var(--text-1);
   font-family: inherit;
   text-align: left;
@@ -764,18 +764,18 @@ svg {
 }
 
 .nft-card.is-active {
-  border-color: rgba(145, 233, 214, 0.72);
+  border-color: rgba(255, 255, 255, 0.62);
   box-shadow:
-    inset 0 0 0 1px rgba(109, 233, 207, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.24),
     0 10px 22px rgba(0, 0, 0, 0.42);
 }
 
 .nft-thumb {
   height: 94px;
   background:
-    radial-gradient(140px 80px at 30% 8%, rgba(109, 233, 207, 0.18), transparent 72%),
-    radial-gradient(160px 110px at 100% -26%, rgba(138, 181, 255, 0.16), transparent 74%),
-    linear-gradient(140deg, #243555 0%, #1a2740 54%, #141f31 100%);
+    radial-gradient(140px 80px at 30% 8%, rgba(255, 255, 255, 0.12), transparent 72%),
+    radial-gradient(160px 110px at 100% -26%, rgba(255, 255, 255, 0.1), transparent 74%),
+    linear-gradient(140deg, #242424 0%, #141414 54%, #0f0f0f 100%);
 }
 
 .nft-thumb img {
@@ -822,8 +822,8 @@ svg {
   border: 1px solid var(--stroke);
   border-radius: 16px;
   background:
-    radial-gradient(180px 96px at 90% -22%, rgba(138, 181, 255, 0.16), transparent 72%),
-    linear-gradient(180deg, rgba(29, 41, 61, 0.9), rgba(22, 31, 47, 0.9));
+    radial-gradient(180px 96px at 90% -22%, rgba(255, 255, 255, 0.1), transparent 72%),
+    linear-gradient(180deg, rgba(23, 23, 23, 0.92), rgba(12, 12, 12, 0.92));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     var(--shadow-soft);
@@ -847,8 +847,8 @@ svg {
   font-weight: 800;
   color: var(--text-1);
   background:
-    radial-gradient(circle at 30% 20%, rgba(109, 233, 207, 0.22), transparent 54%),
-    linear-gradient(180deg, #2a3a56 0%, #1d2b42 100%);
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.14), transparent 54%),
+    linear-gradient(180deg, #262626 0%, #171717 100%);
 }
 
 .nav-avatar {
@@ -902,7 +902,7 @@ svg {
   height: 18px;
   padding: 0 7px;
   border-radius: 999px;
-  border: 1px solid rgba(176, 195, 224, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.26);
   color: var(--text-3);
   font-size: 9px;
   font-weight: 800;
@@ -914,8 +914,8 @@ svg {
   min-width: 52px;
   height: 52px;
   border-radius: 50%;
-  border: 1px solid rgba(176, 195, 224, 0.36);
-  background: rgba(15, 22, 34, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(9, 9, 9, 0.84);
   display: grid;
   place-items: center;
   text-align: center;
@@ -948,7 +948,7 @@ svg {
   border-radius: 12px;
   padding: 8px;
   background:
-    linear-gradient(180deg, rgba(27, 38, 57, 0.88), rgba(20, 29, 44, 0.88));
+    linear-gradient(180deg, rgba(18, 18, 18, 0.9), rgba(10, 10, 10, 0.9));
 }
 
 .stat-row span {
@@ -974,9 +974,9 @@ svg {
   border: 1px solid var(--stroke);
   border-radius: 15px;
   background:
-    radial-gradient(220px 120px at 10% -90%, rgba(138, 181, 255, 0.14), transparent 72%),
-    radial-gradient(220px 120px at 110% -90%, rgba(109, 233, 207, 0.18), transparent 72%),
-    linear-gradient(180deg, rgba(39, 56, 84, 0.94), rgba(27, 40, 62, 0.94));
+    radial-gradient(220px 120px at 10% -90%, rgba(255, 255, 255, 0.09), transparent 72%),
+    radial-gradient(220px 120px at 110% -90%, rgba(255, 255, 255, 0.12), transparent 72%),
+    linear-gradient(180deg, rgba(22, 22, 22, 0.94), rgba(12, 12, 12, 0.94));
   color: var(--text-1);
   font-family: inherit;
   font-size: 15px;
@@ -990,7 +990,7 @@ svg {
   border-color: var(--stroke-strong);
   box-shadow:
     0 12px 26px rgba(0, 0, 0, 0.4),
-    0 0 20px rgba(109, 233, 207, 0.12);
+    0 0 20px rgba(255, 255, 255, 0.1);
 }
 
 .wallet-btn:active {
@@ -1038,7 +1038,7 @@ svg {
   border-radius: 13px;
   border: 1px solid var(--stroke);
   background:
-    linear-gradient(180deg, rgba(25, 35, 52, 0.9), rgba(18, 27, 41, 0.9));
+    linear-gradient(180deg, rgba(17, 17, 17, 0.92), rgba(9, 9, 9, 0.92));
 }
 
 .profile-tab-btn {
@@ -1058,7 +1058,7 @@ svg {
   color: var(--text-1);
   border: 1px solid var(--stroke-strong);
   background:
-    linear-gradient(180deg, rgba(44, 60, 88, 0.92), rgba(31, 45, 68, 0.92));
+    linear-gradient(180deg, rgba(34, 34, 34, 0.92), rgba(21, 21, 21, 0.92));
 }
 
 .profile-nft-grid {
@@ -1079,7 +1079,7 @@ svg {
   border-radius: 14px;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(31, 43, 64, 0.9), rgba(22, 31, 47, 0.9));
+    linear-gradient(180deg, rgba(20, 20, 20, 0.92), rgba(10, 10, 10, 0.94));
 }
 
 .profile-nft-card .nft-thumb {
@@ -1109,9 +1109,9 @@ svg {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: center;
   padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(175, 195, 224, 0.24);
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
   background:
-    linear-gradient(180deg, rgba(10, 14, 22, 0.88) 0%, rgba(8, 11, 18, 0.96) 100%);
+    linear-gradient(180deg, rgba(8, 8, 8, 0.9) 0%, rgba(4, 4, 4, 0.96) 100%);
   backdrop-filter: blur(20px);
   z-index: 20;
 }
@@ -1120,7 +1120,7 @@ svg {
   position: relative;
   border: 0;
   background: transparent;
-  color: #98a7c2;
+  color: #a8a8a8;
   font-family: inherit;
   font-size: 12px;
   font-weight: 700;
@@ -1150,7 +1150,7 @@ svg {
 }
 
 .nav-btn.is-active {
-  color: #f3f8ff;
+  color: #ffffff;
 }
 
 .nav-btn.is-active::before {
@@ -1161,7 +1161,7 @@ svg {
   height: 2px;
   border-radius: 999px;
   background:
-    linear-gradient(90deg, rgba(109, 233, 207, 0), rgba(109, 233, 207, 0.95), rgba(138, 181, 255, 0.95), rgba(138, 181, 255, 0));
+    linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0));
 }
 
 .nav-btn.profile-nav {
@@ -1250,7 +1250,7 @@ svg {
     right: auto;
     transform: translateX(-50%);
     width: min(calc(var(--app-width) - 20px), calc(100vw - 14px));
-    border: 1px solid rgba(175, 195, 224, 0.24);
+    border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: 18px;
     bottom: 8px;
   }
