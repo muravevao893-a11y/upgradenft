@@ -1,4 +1,4 @@
-const APP_VERSION = "2026-02-22-23";
+const APP_VERSION = "2026-02-22-25";
 
 const tabMeta = {
   tasks: {
@@ -817,15 +817,6 @@ function setupTonConnect() {
       void loadWalletBalance(address);
     }, 30000);
   };
-
-  walletBubble.addEventListener("click", async () => {
-    if (!state.tonConnectUI) return;
-    try {
-      await state.tonConnectUI.openModal();
-    } catch (error) {
-      console.error("TonConnect bubble action error:", error);
-    }
-  });
 
   if (!window.TON_CONNECT_UI?.TonConnectUI) {
     walletShort.textContent = "TonConnect UI не загружен";
