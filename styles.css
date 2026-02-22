@@ -1,17 +1,15 @@
 :root {
-  --bg: #0b0c0f;
-  --bg-grad-a: #171a23;
-  --bg-grad-b: #11131a;
-  --panel: #12141a;
-  --panel-soft: #171a22;
-  --stroke: #2d313c;
-  --text: #f3f5fb;
-  --muted: #9da4b2;
-  --accent: #cc4c4c;
-  --ok: #8fd6a4;
-  --danger: #e59b9b;
+  --bg: #0a0b0f;
+  --bg-soft: #11141c;
+  --text: #f4f6ff;
+  --muted: #98a0b4;
+  --line: #2c3140;
+  --line-soft: #242837;
+  --accent: #d84f4f;
+  --ok: #8fd9aa;
+  --danger: #e3a3a3;
   --app-width: 430px;
-  --nav-height: 82px;
+  --nav-height: 84px;
 }
 
 * {
@@ -26,13 +24,13 @@ body {
 
 body {
   margin: 0;
-  color: var(--text);
-  font-family: "Manrope", sans-serif;
   overflow: hidden;
+  font-family: "Manrope", sans-serif;
+  color: var(--text);
   background:
-    radial-gradient(900px 520px at 5% -15%, var(--bg-grad-a) 0%, transparent 70%),
-    radial-gradient(1000px 600px at 110% 120%, var(--bg-grad-b) 0%, transparent 65%),
-    linear-gradient(180deg, #07080b, #0a0c10 50%, #090a0d);
+    radial-gradient(900px 550px at 6% -20%, #1a2234 0%, transparent 70%),
+    radial-gradient(1000px 620px at 110% 130%, #161624 0%, transparent 68%),
+    linear-gradient(180deg, #07080b, #0a0b10 45%, #08090d);
   display: flex;
   justify-content: center;
 }
@@ -50,10 +48,10 @@ p {
 .app-shell {
   width: min(var(--app-width), 100vw);
   height: 100dvh;
+  padding: 12px 12px calc(var(--nav-height) + env(safe-area-inset-bottom) + 10px);
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px 10px calc(var(--nav-height) + env(safe-area-inset-bottom) + 10px);
 }
 
 .app-header {
@@ -62,22 +60,22 @@ p {
 
 .eyebrow {
   margin-bottom: 4px;
+  color: #d6d9e1;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.1em;
-  color: #d2d6de;
 }
 
 .app-header h1 {
-  font-size: clamp(30px, 8vw, 39px);
+  font-size: clamp(30px, 8vw, 40px);
   line-height: 1;
 }
 
 .subtitle {
   margin-top: 6px;
+  color: var(--muted);
   font-size: 14px;
   line-height: 1.22;
-  color: var(--muted);
 }
 
 .sections-wrap {
@@ -97,191 +95,142 @@ p {
 }
 
 .tab-section::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
 }
 
 .tab-section::-webkit-scrollbar-thumb {
+  background: #2c3140;
   border-radius: 999px;
-  background: #2d313c;
 }
 
-.panel {
+.screen {
   min-height: 100%;
-  border: 1px solid var(--stroke);
-  border-radius: 16px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
-  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 10px;
 }
 
-.panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.simple-screen {
+  padding-top: 4px;
 }
 
-.panel-head h2 {
-  font-size: 36px;
-  line-height: 0.95;
-}
-
-.stack-list {
+.simple-list {
   display: grid;
-  gap: 7px;
-}
-
-.list-item {
-  border: 1px solid var(--stroke);
-  border-radius: 12px;
-  background: var(--panel-soft);
-  padding: 11px 10px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 8px;
 }
 
-.list-item strong {
-  font-size: 14px;
+.simple-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--line-soft);
 }
 
-.list-item span {
-  font-size: 13px;
-  color: #d4d8e1;
+.simple-item strong {
+  font-size: 15px;
+  line-height: 1.2;
 }
 
-.list-item small {
+.simple-item small {
+  display: block;
+  margin-top: 2px;
   color: var(--muted);
+  font-size: 12px;
+}
+
+.simple-item span {
+  color: #ebedf4;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
 }
 
 .empty-note {
-  border: 1px dashed #3b404f;
-  border-radius: 12px;
-  padding: 12px;
-  font-size: 13px;
-  line-height: 1.25;
   color: var(--muted);
+  font-size: 13px;
+  line-height: 1.26;
+  padding: 10px 0;
 }
 
 .hidden {
   display: none;
 }
 
-.upgrades-panel {
-  gap: 8px;
+.upgrade-screen {
+  align-items: center;
+  text-align: center;
 }
 
-.upgrade-columns {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+.target-block {
+  width: 100%;
 }
 
-.upgrade-column {
-  border: 1px solid var(--stroke);
-  border-radius: 12px;
-  background: var(--panel-soft);
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.column-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.column-head h2 {
-  font-size: 18px;
-  line-height: 1;
-}
-
-.tiny {
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.select-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 200px;
-  overflow: auto;
-}
-
-.select-list::-webkit-scrollbar {
-  width: 4px;
-}
-
-.select-list::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: #353a48;
-}
-
-.nft-option {
-  border: 1px solid #3b404f;
-  border-radius: 10px;
-  background: #101218;
-  color: var(--text);
-  padding: 8px;
+.label {
   text-align: left;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.target-chip-list {
+  margin-top: 8px;
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+}
+
+.target-chip-list::-webkit-scrollbar {
+  height: 4px;
+}
+
+.target-chip-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #2d3342;
+}
+
+.target-chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 10px;
+  background: #0f1118;
+  color: #d6dbe8;
+  text-align: left;
+  display: grid;
+  gap: 2px;
   font-family: inherit;
   cursor: pointer;
-  display: grid;
-  gap: 4px;
+  white-space: nowrap;
 }
 
-.nft-option.is-active {
-  border-color: #d7d9df;
-  background: #191c24;
-}
-
-.nft-option .nft-title {
+.target-chip b {
   font-size: 13px;
-  font-weight: 700;
-  line-height: 1.2;
 }
 
-.nft-option .nft-meta {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
+.target-chip span {
   color: var(--muted);
+  font-size: 11px;
 }
 
-.chance-layout {
-  display: grid;
-  grid-template-columns: 148px 1fr;
-  gap: 8px;
+.target-chip.is-active {
+  border-color: #d8dce6;
+  color: #f6f8ff;
+  background: #1b1e27;
 }
 
-.chance-wrap,
-.math-box {
-  border: 1px solid var(--stroke);
-  border-radius: 12px;
-  background: var(--panel-soft);
-  padding: 8px;
-}
-
-.chance-wrap {
-  display: grid;
-  justify-items: center;
-  align-content: start;
-  gap: 8px;
+.wheel-zone {
+  margin-top: 4px;
 }
 
 .chance-ring {
   --chance: 0;
-  width: 122px;
-  height: 122px;
+  width: 220px;
+  height: 220px;
   border-radius: 50%;
   position: relative;
-  background: conic-gradient(from -90deg, var(--accent) calc(var(--chance) * 1%), #303443 0);
+  background: conic-gradient(from -90deg, var(--accent) calc(var(--chance) * 1%), #2f3442 0);
   display: grid;
   place-items: center;
 }
@@ -289,34 +238,36 @@ p {
 .chance-ring::after {
   content: "";
   position: absolute;
-  inset: 14px;
+  inset: 22px;
   border-radius: 50%;
-  border: 1px solid #383c4b;
-  background: #0f1116;
+  border: 1px solid #343a4b;
+  background: #0f1117;
 }
 
 .chance-core {
+  position: relative;
   z-index: 2;
   display: grid;
   justify-items: center;
-  line-height: 1;
+  gap: 4px;
 }
 
 .chance-core strong {
-  font-size: 25px;
+  font-size: 46px;
+  line-height: 1;
   font-family: "Space Grotesk", sans-serif;
 }
 
 .chance-core small {
-  margin-top: 3px;
-  font-size: 10px;
   color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .chance-orbit {
   position: absolute;
-  inset: -8px;
+  inset: -10px;
   border-radius: 50%;
   transform: rotate(0deg);
   transform-origin: center;
@@ -328,44 +279,29 @@ p {
   top: 0;
   left: 50%;
   transform: translate(-50%, -45%) rotate(90deg);
-  font-size: 10px;
-  border: 1px solid #4b5061;
+  border: 1px solid #4b5265;
   border-radius: 999px;
-  padding: 1px 5px;
-  background: #0f1015;
-}
-
-.math-box {
-  display: grid;
-  gap: 6px;
-}
-
-.math-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 12px;
-}
-
-.math-row span {
-  color: var(--muted);
+  padding: 2px 7px;
+  font-size: 11px;
+  background: #11131a;
 }
 
 .math-note {
-  margin-top: 2px;
-  font-size: 11px;
-  color: #c6cad4;
-  line-height: 1.25;
+  width: 100%;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.24;
 }
 
 .primary-btn {
-  height: 42px;
-  border: 1px solid #525767;
+  width: 100%;
+  height: 46px;
+  border: 1px solid #555c70;
   border-radius: 12px;
-  background: linear-gradient(180deg, #2d313c, #21252e);
+  background: linear-gradient(180deg, #2f3543, #232834);
   color: var(--text);
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -376,9 +312,11 @@ p {
 }
 
 .upgrade-result {
+  width: 100%;
   min-height: 18px;
-  font-size: 12px;
   color: var(--muted);
+  text-align: left;
+  font-size: 12px;
 }
 
 .upgrade-result.success {
@@ -389,55 +327,125 @@ p {
   color: var(--danger);
 }
 
-.cases-list {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.block-title {
+  width: 100%;
+  text-align: left;
+  margin-top: 2px;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.nft-card-list {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.nft-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #11131a;
+  overflow: hidden;
+  text-align: left;
+  color: var(--text);
+  font-family: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.nft-card.is-active {
+  border-color: #d5d8e2;
+}
+
+.nft-thumb {
+  height: 112px;
+  background:
+    radial-gradient(120px 90px at 30% 10%, #2b2f40 0%, transparent 70%),
+    linear-gradient(160deg, #1a1f2b, #10131a 65%, #14151d);
+}
+
+.nft-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.nft-body {
+  padding: 8px 9px 10px;
+}
+
+.nft-body strong {
+  display: block;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.nft-body small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.nft-body span {
+  display: block;
+  margin-top: 5px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.case-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .case-item {
-  border: 1px solid var(--stroke);
-  border-radius: 12px;
-  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 14px;
   min-height: 118px;
-  padding: 8px;
+  padding: 10px;
   display: grid;
   align-content: end;
-  gap: 4px;
+  gap: 2px;
+  background:
+    radial-gradient(120px 90px at 90% -10%, rgba(130, 142, 178, 0.2), transparent 65%),
+    #10131a;
 }
 
 .case-item strong {
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1;
 }
 
 .case-item span {
-  font-size: 12px;
   color: var(--muted);
+  font-size: 12px;
 }
 
-.profile-panel {
-  display: grid;
-  grid-template-rows: auto auto auto auto 1fr;
-  min-height: 100%;
+.profile-screen {
+  padding-top: 2px;
 }
 
 .profile-top {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 10px;
   align-items: center;
+  gap: 10px;
 }
 
 .profile-avatar,
 .nav-avatar {
-  width: 50px;
-  height: 50px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
-  border: 1px solid #424656;
-  background: linear-gradient(180deg, #2e3240, #1f232d);
+  overflow: hidden;
+  border: 1px solid #424a5e;
+  background: linear-gradient(180deg, #313848, #1f2430);
   display: grid;
   place-items: center;
   font-weight: 800;
-  overflow: hidden;
 }
 
 .nav-avatar {
@@ -454,160 +462,174 @@ p {
 }
 
 .profile-meta h2 {
-  font-size: 28px;
-  line-height: 0.95;
+  font-size: 30px;
+  line-height: 0.94;
 }
 
 .profile-meta p {
   margin-top: 2px;
-  font-size: 13px;
   color: var(--muted);
+  font-size: 13px;
 }
 
 .profile-meta small {
-  margin-top: 2px;
   display: block;
-  color: #c8ccd5;
+  margin-top: 2px;
+  color: #c5cad8;
 }
 
 .profile-rank {
-  border: 1px solid #4a4f5f;
-  border-radius: 999px;
-  padding: 5px 8px;
   text-align: center;
-  min-width: 58px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 8px;
+  min-width: 60px;
 }
 
 .profile-rank span {
   display: block;
-  font-size: 9px;
   color: var(--muted);
+  font-size: 9px;
 }
 
 .profile-rank strong {
   font-size: 13px;
 }
 
-.profile-stats {
+.stat-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
+  gap: 8px;
 }
 
-.profile-stats div {
-  border: 1px solid var(--stroke);
-  border-radius: 10px;
-  background: var(--panel-soft);
-  padding: 8px;
-  text-align: center;
+.stat-row div {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 8px;
 }
 
-.profile-stats span {
+.stat-row span {
   display: block;
-  font-size: 10px;
   color: var(--muted);
-  letter-spacing: 0.04em;
+  font-size: 11px;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.profile-stats strong {
+.stat-row strong {
   display: block;
   margin-top: 2px;
-  font-size: 16px;
-}
-
-.wallet-box {
-  border: 1px solid var(--stroke);
-  border-radius: 12px;
-  background: var(--panel-soft);
-  padding: 8px;
-  display: grid;
-  gap: 7px;
+  font-size: 18px;
 }
 
 .wallet-btn {
-  height: 40px;
-  border: 1px solid #4b5160;
-  border-radius: 10px;
-  background: #222631;
-  color: var(--text);
+  height: 42px;
+  align-self: flex-start;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #18b7ff 0%, #109df5 55%, #0786df 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 8px 18px rgba(8, 121, 214, 0.28);
+  color: #ffffff;
   font-family: inherit;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 800;
   cursor: pointer;
 }
 
+.wallet-btn:active {
+  transform: translateY(1px);
+}
+
+.wallet-btn:disabled {
+  opacity: 0.55;
+}
+
+.wallet-btn-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wallet-btn-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.wallet-btn-icon path {
+  fill: currentColor;
+}
+
+.wallet-btn-text {
+  line-height: 1;
+}
+
 .wallet-short {
-  font-size: 12px;
+  margin-top: -4px;
   color: var(--muted);
+  font-size: 12px;
 }
 
 .profile-tabs {
-  border: 1px solid var(--stroke);
-  border-radius: 12px;
-  background: var(--panel-soft);
-  padding: 4px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
 }
 
 .profile-tab-btn {
-  height: 34px;
-  border: 0;
-  border-radius: 8px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
   background: transparent;
-  color: #c7ccd7;
+  color: #c6ccda;
   font-family: inherit;
-  font-size: 13px;
   font-weight: 700;
+  font-size: 13px;
   cursor: pointer;
 }
 
 .profile-tab-btn.is-active {
-  background: #282c36;
-  color: var(--text);
-}
-
-.profile-nft-wrap {
-  min-height: 0;
-  display: grid;
-  gap: 7px;
+  border-color: #dde1eb;
+  color: #f6f8ff;
 }
 
 .profile-nft-grid {
   display: none;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
+  gap: 8px;
 }
 
 .profile-nft-grid.is-active {
   display: grid;
 }
 
-.nft-tile {
-  border: 1px solid var(--stroke);
-  border-radius: 10px;
-  background: var(--panel-soft);
+.profile-nft-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #10131a;
+}
+
+.profile-nft-card .nft-thumb {
+  height: 76px;
+}
+
+.profile-nft-card .nft-body {
   padding: 7px;
-  display: grid;
-  gap: 3px;
 }
 
-.nft-tile strong {
-  font-size: 12px;
-  line-height: 1.2;
-}
-
-.nft-tile span {
-  font-size: 10px;
-  color: var(--muted);
-}
-
-.nft-tile em {
+.profile-nft-card .nft-body strong {
   font-size: 11px;
-  color: #eceef4;
-  font-style: normal;
+}
+
+.profile-nft-card .nft-body small {
+  font-size: 10px;
+}
+
+.profile-nft-card .nft-body span {
+  font-size: 11px;
 }
 
 .bottom-nav {
@@ -616,18 +638,19 @@ p {
   right: 0;
   bottom: 0;
   height: var(--nav-height);
-  border-top: 1px solid var(--stroke);
-  background: rgba(12, 14, 19, 0.96);
+  border-top: 1px solid var(--line);
+  background: rgba(10, 12, 16, 0.96);
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: center;
   padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  z-index: 20;
 }
 
 .nav-btn {
   border: 0;
   background: transparent;
-  color: #9096a5;
+  color: #8e96a8;
   font-family: inherit;
   font-size: 11px;
   display: inline-flex;
@@ -639,8 +662,8 @@ p {
 }
 
 .nav-btn svg {
-  width: 21px;
-  height: 21px;
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.9;
@@ -649,32 +672,36 @@ p {
 }
 
 .nav-btn.is-active {
-  color: #f0f2f8;
+  color: #f6f8ff;
 }
 
 .nav-btn.profile-nav {
   gap: 2px;
 }
 
-@media (max-width: 390px) {
+@media (max-width: 380px) {
   .app-shell {
     padding-inline: 8px;
   }
 
-  .chance-layout {
+  .chance-ring {
+    width: 192px;
+    height: 192px;
+  }
+
+  .chance-ring::after {
+    inset: 18px;
+  }
+
+  .chance-core strong {
+    font-size: 40px;
+  }
+
+  .nft-card-list {
     grid-template-columns: 1fr;
   }
 
-  .chance-wrap {
-    justify-items: start;
-  }
-
-  .chance-ring {
-    width: 108px;
-    height: 108px;
-  }
-
-  .cases-list {
+  .profile-nft-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -684,8 +711,8 @@ p {
     left: 50%;
     right: auto;
     transform: translateX(-50%);
-    width: min(calc(var(--app-width) - 20px), calc(100vw - 16px));
-    border: 1px solid var(--stroke);
+    width: min(calc(var(--app-width) - 22px), calc(100vw - 16px));
+    border: 1px solid var(--line);
     border-radius: 16px;
     bottom: 8px;
   }

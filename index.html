@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0c0f">
+  <meta name="theme-color" content="#0a0b0f">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -12,115 +12,74 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=2026-02-22-5">
+  <link rel="stylesheet" href="./styles.css?v=2026-02-22-7">
 
   <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
   <script defer src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-  <script defer src="./app.js?v=2026-02-22-5"></script>
+  <script defer src="./app.js?v=2026-02-22-7"></script>
 </head>
 <body>
   <main class="app-shell">
     <header class="app-header">
       <p class="eyebrow">UPGRADE NFT</p>
       <h1 id="screen-title">Апгрейды</h1>
-      <p id="screen-subtitle" class="subtitle">Выбирай NFT и запускай апгрейд по вероятности.</p>
+      <p id="screen-subtitle" class="subtitle">Выбирай цель и запускай апгрейд.</p>
     </header>
 
     <div class="sections-wrap">
       <section class="tab-section" data-tab-section="tasks">
-        <article class="panel">
-          <div class="panel-head">
-            <h2>Задания</h2>
-          </div>
-          <div id="tasks-list" class="stack-list"></div>
+        <div class="screen simple-screen">
+          <div id="tasks-list" class="simple-list"></div>
           <p id="tasks-empty" class="empty-note">Нет активных заданий.</p>
-        </article>
+        </div>
       </section>
 
       <section class="tab-section is-active" data-tab-section="upgrades">
-        <article class="panel upgrades-panel">
-          <div class="upgrade-columns">
-            <div class="upgrade-column">
-              <div class="column-head">
-                <h2>Ваши NFT</h2>
-                <span id="source-total" class="tiny">-</span>
-              </div>
-              <div id="own-nft-list" class="select-list"></div>
-              <p id="own-empty" class="empty-note">Подключи кошелек и загрузи NFT.</p>
-            </div>
+        <div class="screen upgrade-screen">
+          <div class="target-block">
+            <p class="label">Цель апгрейда</p>
+            <div id="target-nft-list" class="target-chip-list"></div>
+            <p id="target-empty" class="empty-note">Нет доступных целей апгрейда.</p>
+          </div>
 
-            <div class="upgrade-column">
-              <div class="column-head">
-                <h2>Хочу получить</h2>
-                <span id="target-total" class="tiny">-</span>
+          <div class="wheel-zone">
+            <div id="chance-ring" class="chance-ring" style="--chance:0">
+              <div class="chance-orbit">
+                <span class="orbit-arrow">➤</span>
               </div>
-              <div id="target-nft-list" class="select-list"></div>
-              <p id="target-empty" class="empty-note">Нет доступных целей апгрейда.</p>
+              <div class="chance-core">
+                <strong id="chance-value">0%</strong>
+                <small>вероятность</small>
+              </div>
             </div>
           </div>
 
-          <div class="chance-layout">
-            <div class="chance-wrap">
-              <p class="tiny">Шанс апгрейда</p>
-              <div id="chance-ring" class="chance-ring" style="--chance:0">
-                <div class="chance-orbit">
-                  <span class="orbit-arrow">➤</span>
-                </div>
-                <div class="chance-core">
-                  <strong id="chance-value">0%</strong>
-                  <small>вероятность</small>
-                </div>
-              </div>
-            </div>
-
-            <div class="math-box">
-              <div class="math-row">
-                <span>Ваш NFT</span>
-                <strong id="math-source">-</strong>
-              </div>
-              <div class="math-row">
-                <span>Цель</span>
-                <strong id="math-target">-</strong>
-              </div>
-              <div class="math-row">
-                <span>Value ratio</span>
-                <strong id="math-ratio">-</strong>
-              </div>
-              <div class="math-row">
-                <span>Tier pressure</span>
-                <strong id="math-tier">-</strong>
-              </div>
-              <p id="math-note" class="math-note">Выбери исходный NFT и цель.</p>
-            </div>
-          </div>
-
+          <p id="math-note" class="math-note">Выбери NFT из списка ниже.</p>
           <button id="upgrade-btn" class="primary-btn" type="button">Запустить апгрейд</button>
           <p id="upgrade-result" class="upgrade-result" aria-live="polite"></p>
-        </article>
+
+          <h2 class="block-title">Мои NFT</h2>
+          <div id="own-nft-list" class="nft-card-list"></div>
+          <p id="own-empty" class="empty-note">Подключи кошелек и загрузи NFT.</p>
+        </div>
       </section>
 
       <section class="tab-section" data-tab-section="cases">
-        <article class="panel">
-          <div class="panel-head">
-            <h2>Кейсы</h2>
-          </div>
-          <div id="cases-list" class="stack-list cases-list"></div>
+        <div class="screen simple-screen">
+          <div id="cases-list" class="case-list"></div>
           <p id="cases-empty" class="empty-note">Нет кейсов для текущего уровня.</p>
-        </article>
+        </div>
       </section>
 
       <section class="tab-section" data-tab-section="bonuses">
-        <article class="panel">
-          <div class="panel-head">
-            <h2>Бонусы</h2>
-          </div>
-          <div id="bonuses-list" class="stack-list"></div>
+        <div class="screen simple-screen">
+          <div id="bonuses-list" class="simple-list"></div>
           <p id="bonuses-empty" class="empty-note">Нет активных бонусов.</p>
-        </article>
+        </div>
       </section>
 
       <section class="tab-section" data-tab-section="profile">
-        <article class="panel profile-panel">
+        <div class="screen profile-screen">
           <div class="profile-top">
             <div id="profile-avatar" class="profile-avatar">U</div>
             <div class="profile-meta">
@@ -134,7 +93,7 @@
             </div>
           </div>
 
-          <div class="profile-stats">
+          <div class="stat-row">
             <div>
               <span>NFT</span>
               <strong id="stat-nft-count">-</strong>
@@ -149,24 +108,27 @@
             </div>
           </div>
 
-          <div class="wallet-box">
-            <button id="connect-wallet-btn" class="wallet-btn" type="button">Connect TON Wallet</button>
-            <p id="wallet-short" class="wallet-short">Кошелек не подключен</p>
-          </div>
+          <button id="connect-wallet-btn" class="wallet-btn" type="button">
+            <span class="wallet-btn-inner">
+              <svg class="wallet-btn-icon" viewBox="0 0 56 56" aria-hidden="true" focusable="false">
+                <path d="M28 6.8h17.6c3.4 0 5.6 3.7 3.9 6.7L31.5 43.8c-1.6 2.8-5.6 2.8-7.2 0L6.5 13.5c-1.7-3 .5-6.7 3.9-6.7H28Zm0 7.4H14.3l13.7 23.3 13.7-23.3H28Z"/>
+              </svg>
+              <span class="wallet-btn-text">Connect Wallet</span>
+            </span>
+          </button>
+          <p id="wallet-short" class="wallet-short">Кошелек не подключен</p>
 
           <div class="profile-tabs">
             <button class="profile-tab-btn is-active" data-profile-tab="my" type="button">Мои NFT</button>
             <button class="profile-tab-btn" data-profile-tab="dropped" type="button">Выбитые NFT</button>
           </div>
 
-          <div class="profile-nft-wrap">
-            <div id="my-nft-grid" class="profile-nft-grid is-active" data-profile-grid="my"></div>
-            <p id="my-empty" class="empty-note">В инвентаре пока нет NFT.</p>
+          <div id="my-nft-grid" class="profile-nft-grid is-active" data-profile-grid="my"></div>
+          <p id="my-empty" class="empty-note">В инвентаре пока нет NFT.</p>
 
-            <div id="dropped-nft-grid" class="profile-nft-grid" data-profile-grid="dropped"></div>
-            <p id="dropped-empty" class="empty-note hidden">Пока не выбито ни одного NFT.</p>
-          </div>
-        </article>
+          <div id="dropped-nft-grid" class="profile-nft-grid" data-profile-grid="dropped"></div>
+          <p id="dropped-empty" class="empty-note hidden">Пока не выбито ни одного NFT.</p>
+        </div>
       </section>
     </div>
   </main>
