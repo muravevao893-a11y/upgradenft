@@ -1145,11 +1145,36 @@ function normalizeMediaUrl(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
   const apiBase = String(UPGRADE_API_BASE || "").trim().replace(/\/$/, "");
+
+  const resolveTelegramFileProxyBase = () => {
+    if (apiBase) {
+      return apiBase;
+    }
+
+    // If upgrade backend isn't configured, try to infer file proxy base from gifts endpoint.
+    const hint = String(firstNonEmptyString(
+      state?.telegramGiftsEndpoint,
+      TELEGRAM_GIFTS_ENDPOINT,
+    )).trim();
+    if (!hint) return "";
+
+    try {
+      const endpointUrl = new URL(hint, window.location.href);
+      const hasApiPrefix = endpointUrl.pathname.startsWith("/api/");
+      return `${endpointUrl.origin}${hasApiPrefix ? "/api" : ""}`;
+    } catch {
+      return "";
+    }
+  };
   if (/^tgfile:/i.test(raw)) {
     const fileId = raw.slice("tgfile:".length).trim();
     if (!fileId) return "";
-    if (!apiBase) return "";
-    return `${apiBase}/telegram/file?file_id=${encodeURIComponent(fileId)}`;
+    const proxyBase = resolveTelegramFileProxyBase();
+    if (!proxyBase) {
+      // Best-effort fallback for same-origin backends.
+      return `/telegram/file?file_id=${encodeURIComponent(fileId)}`;
+    }
+    return `${proxyBase}/telegram/file?file_id=${encodeURIComponent(fileId)}`;
   }
   if (apiBase && /^(\/)?(api\/)?telegram\/file\?/i.test(raw)) {
     const normalizedPath = raw.startsWith("/") ? raw : `/${raw}`;
@@ -3461,6 +3486,8 @@ function resolveBooleanFromPaths(source, paths) {
 
 function isLikelyUpgradedTelegramGift(item) {
   if (!item || typeof item !== "object") return false;
+  const giftType = String(item?.type ?? readPathValue(item, "gift.type") ?? "").trim().toLowerCase();
+  if (giftType === "unique") return true;
   if (resolveBooleanFromPaths(item, ["is_upgraded", "isUpgraded", "gift.is_upgraded", "gift.isUpgraded"])) return true;
   if (resolveBooleanFromPaths(item, ["is_unique", "isUnique", "gift.is_unique", "gift.isUnique"])) return true;
   if (String(item?.nft_address ?? item?.nftAddress ?? "").trim()) return true;
@@ -3545,6 +3572,13 @@ function buildNftModelFromTelegramGift(item, index) {
 
   const giftId = firstNonEmptyString(
     firstNonEmptyStringFromPaths(item, [
+      "slug",
+      "gift.name",
+      "gift.unique_name",
+      "gift.uniqueName",
+      "unique_gift.name",
+      "uniqueGift.name",
+      "nft.name",
       "nft_address",
       "nftAddress",
       "nft.address",
@@ -3564,6 +3598,7 @@ function buildNftModelFromTelegramGift(item, index) {
       "tokenId",
       "nft.id",
       "nft.token_id",
+      // Keep number fields late to avoid collisions across different gifts.
       "number",
       "gift.number",
       "nft.number",

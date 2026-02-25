@@ -385,18 +385,70 @@ function extractGiftItems(payload) {
 
 function dedupeGifts(list) {
   const map = new Map();
-  safeArray(list).forEach((item, index) => {
-    if (!item || typeof item !== "object") return;
-    const key = firstNonEmptyString(
-      item.id,
-      item.gift_id,
+
+  const slugify = (value) => String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 72);
+
+  const buildCanonicalKey = (item, index) => {
+    if (!item || typeof item !== "object") return "";
+
+    // 1) Real on-chain identifiers.
+    const onchain = firstNonEmptyString(
       item.nft_address,
       item.nftAddress,
+      item.address,
       item.token_id,
       item.tokenId,
-      item.address,
-      item.name ? `${item.name}-${index}` : "",
     );
+    if (onchain) return String(onchain).trim();
+
+    // 2) Telegram unique gift name/slug is stable and globally unique.
+    const giftName = firstNonEmptyStringFromPaths(item, [
+      "slug",
+      "gift.name",
+      "gift.unique_name",
+      "gift.uniqueName",
+      "unique_gift.name",
+      "uniqueGift.name",
+      "nft.name",
+    ]);
+    if (giftName) return `tg:${String(giftName).trim()}`;
+
+    // 3) Base name + number is stable for unique gifts.
+    const baseName = firstNonEmptyStringFromPaths(item, [
+      "gift.base_name",
+      "gift.baseName",
+      "base_name",
+      "baseName",
+      "gift.name",
+    ]);
+    const number = firstNonEmptyStringFromPaths(item, [
+      "gift.number",
+      "number",
+      "gift.unique_gift_number",
+      "unique_gift_number",
+    ]);
+    if (baseName && number) {
+      const baseSlug = slugify(baseName);
+      if (baseSlug) return `tg:${baseSlug}-${String(number).trim()}`;
+    }
+
+    // 4) Fallback to explicit id fields.
+    const explicitId = firstNonEmptyString(item.id, item.gift_id);
+    if (explicitId) return `id:${String(explicitId).trim()}`;
+
+    // 5) Last resort: stable-ish fingerprint.
+    const name = String(item.name || "").trim();
+    if (name) return `name:${slugify(name)}-${index}`;
+    return "";
+  };
+
+  safeArray(list).forEach((item, index) => {
+    const key = buildCanonicalKey(item, index);
     if (!key) return;
     if (!map.has(key)) {
       map.set(key, item);
@@ -405,6 +457,7 @@ function dedupeGifts(list) {
     const prev = map.get(key);
     map.set(key, { ...prev, ...item });
   });
+
   return Array.from(map.values());
 }
 
@@ -907,21 +960,73 @@ function isLikelyTelegramUpgradedGift(ownedGift) {
   return false;
 }
 
-function mapTelegramBotOwnedGiftToGift(ownedGift, index = 0) {
-  if (!ownedGift || typeof ownedGift !== "object") return null;
-  if (!isLikelyTelegramUpgradedGift(ownedGift)) return null;
+function buildTelegramBotGiftStableId(ownedGift, index = 0) {
+  if (!ownedGift || typeof ownedGift !== "object") return `tg-bot-${index + 1}`;
 
-  const giftId = firstNonEmptyStringFromPaths(ownedGift, [
+  const slugify = (value) => String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 72);
+
+  // Most stable: the unique gift name used in t.me/nft/... links.
+  const uniqueName = String(firstNonEmptyStringFromPaths(ownedGift, [
+    "gift.name",
+    "gift.unique_name",
+    "gift.uniqueName",
+  ])).trim();
+  if (uniqueName) return uniqueName;
+
+  // Also stable: on-chain address if present.
+  const nftAddress = String(firstNonEmptyStringFromPaths(ownedGift, [
+    "gift.nft_address",
+    "gift.nftAddress",
+    "gift.nft.address",
+  ])).trim();
+  if (nftAddress) return nftAddress;
+
+  // Fallback: base name + unique number.
+  const baseName = String(firstNonEmptyStringFromPaths(ownedGift, [
+    "gift.base_name",
+    "gift.baseName",
+    "gift.name",
+    "gift.title",
+  ])).trim();
+  const number = String(firstNonEmptyStringFromPaths(ownedGift, [
+    "gift.number",
+    "gift.unique_gift_number",
+    "unique_gift_number",
+    "number",
+  ])).trim();
+  if (baseName && number) {
+    const baseSlug = slugify(baseName);
+    if (baseSlug) return `${baseSlug}-${number}`;
+  }
+
+  // Last resort: owned gift id if available.
+  const ownedId = String(firstNonEmptyStringFromPaths(ownedGift, [
     "owned_gift_id",
     "gift.owned_gift_id",
     "gift.gift_id",
     "gift.id",
-    "gift.number",
-    "gift.nft_address",
-    "gift.nftAddress",
-    "gift.nft.address",
     "id",
-  ]) || `tg-bot-${index + 1}`;
+  ])).trim();
+  if (ownedId) return `tg-owned-${ownedId}`;
+
+  return `tg-bot-${index + 1}`;
+}
+
+function mapTelegramBotOwnedGiftToGift(ownedGift, index = 0) {
+  if (!ownedGift || typeof ownedGift !== "object") return null;
+  if (!isLikelyTelegramUpgradedGift(ownedGift)) return null;
+
+  const giftId = buildTelegramBotGiftStableId(ownedGift, index);
+  const giftSlug = String(firstNonEmptyStringFromPaths(ownedGift, [
+    "gift.name",
+    "gift.unique_name",
+    "gift.uniqueName",
+  ])).trim();
 
   const imageFileId = firstNonEmptyStringFromPaths(ownedGift, [
     "gift.model.sticker.thumbnail.file_id",
@@ -955,6 +1060,7 @@ function mapTelegramBotOwnedGiftToGift(ownedGift, index = 0) {
   const mapped = {
     id: String(giftId),
     gift_id: String(giftId),
+    slug: giftSlug || undefined,
     name: resolveTelegramGiftDisplayName(ownedGift),
     tier: tier || "Rare",
     image_url: imageUrl || undefined,
@@ -1514,16 +1620,21 @@ function buildNftModelFromTonapiItem(item, value, fallbackId, sourceTag = "walle
 
 function buildNftModelFromGift(item, index) {
   const giftId = firstNonEmptyStringFromPaths(item, [
-    "id",
-    "gift_id",
-    "gift.id",
+    "slug",
+    "gift.name",
+    "gift.unique_name",
+    "gift.uniqueName",
+    "unique_gift.name",
+    "uniqueGift.name",
+    "nft.name",
     "nft_address",
     "nftAddress",
     "nft.address",
     "token_id",
     "tokenId",
-    "number",
-    "gift.number",
+    "id",
+    "gift_id",
+    "gift.id",
   ]) || `tg-${index + 1}`;
 
   const animationCandidates = collectMediaCandidatesFromPaths(item, [
